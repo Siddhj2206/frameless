@@ -45,6 +45,21 @@ skill is the home for durable learning; a changelog, a session note, or an
 "append here" section is not. When a workaround or convention surprised you,
 the next agent needs it.
 
+## Development memory
+
+While frameless is being written, GitHub issues are the memory layer. Record
+what BuildStream is and how it works, how frameless maps onto it, design
+decisions, open questions, and the full write-up of the project as issues and
+their comments, so the thread survives across sessions and agents instead of
+living in a chat or a scratch file.
+
+One issue per topic. Search the tracker first and add to the existing issue
+rather than opening a duplicate.
+
+This is temporary: it holds for the development period only, and it does not
+replace Self-improvement above. When a finding is durable, move it into the
+owning skill and close the issue.
+
 ## Ownership
 
 Humans triage and approve; agents work only on assigned or `3-clanker-queue`
