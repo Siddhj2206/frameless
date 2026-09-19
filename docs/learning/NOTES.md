@@ -8,6 +8,9 @@ sessions don't have to re-ask.
 - **Learn as we go.** Learning is tied to the wayfinder map: each resolved
   ticket emits a learning record, and a durable concept earns a reference doc
   and a lesson.
+- **Sync after every ticket.** Before closing a map ticket, update
+  `docs/learning/`: a record for what was established, plus a lesson or
+  reference when a concept is durable. Don't leave it to a later session.
 - **Markdown lessons**, not HTML (chosen over the teach skill's default for repo
   consistency and diffability).
 - **Short and tied to the mission.** A lesson is one tightly-scoped thing.
