@@ -58,7 +58,12 @@ rather than getting one issue each. Search the tracker before adding.
 
 Research lives in `docs/research/`, one markdown file per topic, cited to its
 sources. Scouting passes, source reading, and comparisons write there so the
-findings are reviewable rather than trapped in a session.
+findings are reviewable rather than trapped in a session. Research and learning
+land on `main` — no separate branches.
+
+Learning lives in `docs/learning/` (mission, resources, notes, reference,
+lessons, learning records), and `CONTEXT.md` at the root is the canonical
+glossary. See `docs/learning/NOTES.md`.
 
 **Direction.** finpilot is legacy — a reference for feature scope, not code to
 preserve. frameless replaces it wholesale, removing the bootc/RPM structure as
