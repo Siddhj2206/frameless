@@ -60,6 +60,12 @@ Research lives in `docs/research/`, one markdown file per topic, cited to its
 sources. Scouting passes, source reading, and comparisons write there so the
 findings are reviewable rather than trapped in a session.
 
+**Direction.** finpilot is legacy — a reference for feature scope, not code to
+preserve. frameless replaces it wholesale, removing the bootc/RPM structure as
+the BuildStream replacement lands. Where frameless follows a pattern, the
+pattern is dakota's: frameless is to dakota what finpilot is to Bluefin, and
+`~/Projects/dakota` is the parent project to read first.
+
 This is temporary: it holds for the development period only, and it does not
 replace Self-improvement above. When a finding is durable, move it into the
 owning skill and close the issue.
