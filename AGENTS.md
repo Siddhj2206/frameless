@@ -64,7 +64,9 @@ findings are reviewable rather than trapped in a session.
 preserve. frameless replaces it wholesale, removing the bootc/RPM structure as
 the BuildStream replacement lands. Where frameless follows a pattern, the
 pattern is dakota's: frameless is to dakota what finpilot is to Bluefin, and
-`~/Projects/dakota` is the parent project to read first.
+`~/Projects/dakota` is the parent project to read first. Keep finpilot's
+conveniences, but prefer BuildStream best practice even where that changes
+behaviour.
 
 This is temporary: it holds for the development period only, and it does not
 replace Self-improvement above. When a finding is durable, move it into the
