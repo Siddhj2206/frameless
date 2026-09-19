@@ -56,6 +56,10 @@ living in a chat or a scratch file.
 One issue per topic. Search the tracker first and add to the existing issue
 rather than opening a duplicate.
 
+Research lives in `docs/research/`, one markdown file per topic, cited to its
+sources. Scouting passes, source reading, and comparisons write there so the
+findings are reviewable rather than trapped in a session.
+
 This is temporary: it holds for the development period only, and it does not
 replace Self-improvement above. When a finding is durable, move it into the
 owning skill and close the issue.
