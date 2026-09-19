@@ -53,8 +53,8 @@ decisions, open questions, and the full write-up of the project as issues and
 their comments, so the thread survives across sessions and agents instead of
 living in a chat or a scratch file.
 
-One issue per topic. Search the tracker first and add to the existing issue
-rather than opening a duplicate.
+Open issues sparingly — decisions consolidate into the plan issue or a doc
+rather than getting one issue each. Search the tracker before adding.
 
 Research lives in `docs/research/`, one markdown file per topic, cited to its
 sources. Scouting passes, source reading, and comparisons write there so the
@@ -69,6 +69,20 @@ pattern is dakota's: frameless is to dakota what finpilot is to Bluefin, and
 This is temporary: it holds for the development period only, and it does not
 replace Self-improvement above. When a finding is durable, move it into the
 owning skill and close the issue.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live as GitHub issues in this repo. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Triage roles map onto projectbluefin's seven-label contract (`1-triage`, `2-discussing`, `3-human-queue`, `3-clanker-queue`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
 ## Ownership
 
