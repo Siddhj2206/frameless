@@ -7,6 +7,10 @@ export qemu_image := env("QEMU_IMAGE", "ghcr.io/qemus/qemu:7.50@sha256:e7f6fda52
 export vm_ram := env("VM_RAM", "8192")
 export vm_cpus := env("VM_CPUS", "4")
 
+# BuildStream container image used by local runs and CI. Pinned to a digest for
+# reproducibility; override with BST2_IMAGE.
+export bst2_image := env("BST2_IMAGE", "registry.gitlab.com/freedesktop-sdk/infrastructure/freedesktop-sdk-docker-images/bst2:64eb0b4930d57a92710822898fb73af6cc1ae35d")
+
 alias build-vm := build-qcow2
 alias rebuild-vm := rebuild-qcow2
 alias run-vm := run-vm-qcow2
@@ -32,6 +36,36 @@ _format-justfiles $mode="":
 [group('Just')]
 check:
     just _format-justfiles "--check"
+
+# Run any BuildStream command in the pinned freedesktop-sdk bst2 container.
+#
+# The container carries bst and its sandbox tooling, so no local BuildStream
+# install is needed. Set BST2_IMAGE to override the pinned digest, or
+# BST_RUNNER to an alternate runner (used by tests). BST_FLAGS appends flags;
+# BST_PODMAN_EXTRA_ARGS adds podman flags.
+#
+# Usage: just bst build oci/frameless.bst
+# just bst show --deps all oci/frameless.bst
+[group('BuildStream')]
+bst *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -n "${BST_RUNNER:-}" ]; then
+        exec "$BST_RUNNER" {{ ARGS }}
+    fi
+    mkdir -p "${HOME}/.cache/buildstream"
+    # Word-splitting on the optional flags is intentional.
+    # shellcheck disable=SC2086
+    podman run --rm \
+        --privileged \
+        --device /dev/fuse \
+        --network=host \
+        ${BST_PODMAN_EXTRA_ARGS:-} \
+        -v "{{ justfile_directory() }}:/src:rw" \
+        -v "${HOME}/.cache/buildstream:/root/.cache/buildstream:rw" \
+        -w /src \
+        "{{ bst2_image }}" \
+        bash -c 'bst --colors "$@"' -- --no-interactive ${BST_FLAGS:-} {{ ARGS }}
 
 # Run the contract suite: interfaces the image must satisfy. A fork keeps these.
 [group('Just')]
