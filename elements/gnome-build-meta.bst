@@ -29,3 +29,6 @@ config:
     plugins/buildstream-plugins-community.bst: plugins/buildstream-plugins-community.bst
     # Use our os-release, so the image carries frameless's identity.
     oci/integration/os-release.bst: oci/os-release.bst
+    # gnome-build-meta's signed-modules.bst needs a private signing key that is
+    # not in the public repository; stage the modules unsigned instead.
+    gnomeos/initramfs/signed-modules.bst: kernel/unsigned-modules.bst

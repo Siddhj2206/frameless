@@ -8,8 +8,10 @@ export vm_ram := env("VM_RAM", "8192")
 export vm_cpus := env("VM_CPUS", "4")
 
 # BuildStream container image used by local runs and CI. Pinned to a digest for
-# reproducibility; override with BST2_IMAGE.
-export bst2_image := env("BST2_IMAGE", "registry.gitlab.com/freedesktop-sdk/infrastructure/freedesktop-sdk-docker-images/bst2:64eb0b4930d57a92710822898fb73af6cc1ae35d")
+# reproducibility; override with BST2_IMAGE. This digest is the freedesktop-sdk
+# bst2 image carrying BuildStream 2.8, matching project.conf's min-version; the
+# previously pinned :64eb0b49 image carried 2.7 and could not load the project.
+export bst2_image := env("BST2_IMAGE", "registry.gitlab.com/freedesktop-sdk/infrastructure/freedesktop-sdk-docker-images/bst2@sha256:b090811a617cb4c11c8ab9b08aa272a6b90c58cb289193f178ea5ca4d3ced681")
 
 alias build-vm := build-qcow2
 alias rebuild-vm := rebuild-qcow2

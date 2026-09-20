@@ -2,3 +2,7 @@ cosign.key
 _build_*
 output
 _build-*/**
+
+# BuildStream local state and scratch checkouts
+.bst/
+.checkout/
