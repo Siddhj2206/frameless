@@ -344,3 +344,24 @@ by SHA like fsdk-containers/server do, and if frameless needs a version-derived
 tag or `%{fsdk-version}` variable, copy fsdk-containers' regenerate
 `include/fsdk-version.yml` trick. Keep `sudo_cmd` auto-detection out unless
 rootful podman is actually needed; rootless works.
+
+---
+
+## 7. Update (2026-09-20): the pinned digest carried BuildStream 2.7
+
+The `:64eb0b49…` digest verified in section 2 carries **BuildStream 2.7.0**.
+That is fine for dakota, fsdk-containers, and server because all three declare
+`min-version: 2.5`. It is *not* fine for frameless, which declares
+`min-version: 2.8`: every `just bst` invocation failed at project load with
+
+```
+Error loading project: project.conf [line 25 column 13]: Version mismatch
+    Project requires at least BuildStream 2.8, but BuildStream 2.7 is installed.
+```
+
+The floating `:latest` tag now carries **2.8.0** (manifest-list digest
+`sha256:b090811a617cb4c11c8ab9b08aa272a6b90c58cb289193f178ea5ca4d3ced681`), so
+`just bst` pins that digest instead. The lesson: `min-version` is a floor the
+*runner* must clear, so the runner digest and `min-version` are one decision —
+bump them together. See `elements/core/sandbox-tools.bst` for the sibling
+finding that FSDK 26.08's `runtime-minimal` no longer carries a shell.
