@@ -1,51 +1,64 @@
 #!/usr/bin/env bats
-# Contract: the project name is restated in files that cannot read each other, so
-# nothing but this test keeps them in agreement. build-image.yml publishes under
-# the repository name; the sites below are the local fallbacks a fork edits by
-# hand, and a fork that renames only some of them ships an image that
+# Contract: image identity has one source of truth.
+#
+# project.conf holds the name and vendor; the os-release generator and the OCI
+# assembly must consume them by reference (%{project-name}, %{image-vendor}),
+# never restate them. A fork that hardcodes a name ships an image that
 # misidentifies itself.
 #
-# Only sites that restate the name literally are checked. build-image.yml and
-# clean.yml derive it from github.event.repository.name at runtime and cannot
-# drift. README.md restates it in prose and is not checked here.
+# This is the static half of the contract. The built os-release is checked once
+# the image graph builds (integration tests).
 
 REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
-CONTAINERFILE="${REPO_ROOT}/Containerfile"
+PROJECT_CONF="${REPO_ROOT}/project.conf"
+OS_RELEASE_YML="${REPO_ROOT}/include/os-release.yml"
+OCI_IMAGE="${REPO_ROOT}/elements/oci/image.bst"
 
-# The Containerfile ARG is the authoritative local value; every site must match.
-image_name() {
-    sed -n 's/^ARG IMAGE_NAME="\(.*\)"$/\1/p' "${CONTAINERFILE}"
-}
+project_name() { sed -n 's/^name: //p' "${PROJECT_CONF}"; }
+project_vendor() { sed -n 's/^  image-vendor: //p' "${PROJECT_CONF}"; }
+project_description() { sed -n 's/^  image-description: //p' "${PROJECT_CONF}"; }
 
-assert_same_name() {
-    local site=$1 actual=$2 expected
-    expected="$(image_name)"
-    if [[ "${actual}" != "${expected}" ]]; then
-        printf 'FAIL: %s says %q; Containerfile ARG IMAGE_NAME says %q\n' \
-            "${site}" "${actual}" "${expected}" >&2
-        return 1
-    fi
-}
-
-@test "identity: the Containerfile declares exactly one image name" {
-    run image_name
+@test "identity: project.conf declares exactly one name" {
+    run project_name
     [ "$status" -eq 0 ]
     [ -n "${output}" ]
     [ "$(printf '%s\n' "${output}" | wc -l)" -eq 1 ]
 }
 
-@test "identity: the Containerfile name comment matches ARG IMAGE_NAME" {
-    actual="$(sed -n 's/^# Name: //p' "${CONTAINERFILE}")"
-    assert_same_name "Containerfile '# Name:'" "${actual}"
+@test "identity: project.conf declares vendor and description" {
+    run project_vendor
+    [ -n "${output}" ]
+    run project_description
+    [ -n "${output}" ]
 }
 
-@test "identity: the Justfile IMAGE_NAME default matches ARG IMAGE_NAME" {
-    actual="$(sed -n 's/^export IMAGE_NAME := env("IMAGE_NAME", "\(.*\)")$/\1/p' "${REPO_ROOT}/Justfile")"
-    assert_same_name "Justfile export IMAGE_NAME" "${actual}"
+@test "identity: the os-release generator references the project identity" {
+    grep -Fq 'IMAGE_NAME: "%{project-name}"' "${OS_RELEASE_YML}"
+    grep -Fq 'IMAGE_VENDOR: "%{image-vendor}"' "${OS_RELEASE_YML}"
+    grep -Fq 'IMAGE_REF: "ostree-image-signed:docker://ghcr.io/%{image-vendor}/%{project-name}"' "${OS_RELEASE_YML}"
 }
 
-@test "identity: artifacthub-repo.yml repositoryID matches ARG IMAGE_NAME" {
-    [ -f "${REPO_ROOT}/artifacthub-repo.yml" ] || skip "this fork does not publish to Artifact Hub"
-    actual="$(sed -n 's/^repositoryID: \([^ ]*\).*$/\1/p' "${REPO_ROOT}/artifacthub-repo.yml")"
-    assert_same_name "artifacthub-repo.yml repositoryID" "${actual}"
+@test "identity: the os-release generator does not hardcode the project name" {
+    local name
+    name="$(project_name)"
+    ! grep -Fq "IMAGE_NAME: \"${name}\"" "${OS_RELEASE_YML}"
+}
+
+@test "identity: the os-release generator carries the contract fields" {
+    grep -Fq 'NAME="${IMAGE_PRETTY_NAME}"' "${OS_RELEASE_YML}"
+    grep -Fq 'PRETTY_NAME="${IMAGE_PRETTY_NAME}"' "${OS_RELEASE_YML}"
+    grep -Fq 'IMAGE_NAME="${IMAGE_NAME}"' "${OS_RELEASE_YML}"
+    grep -Fq 'IMAGE_VENDOR="${IMAGE_VENDOR}"' "${OS_RELEASE_YML}"
+    grep -Fq 'IMAGE_REF="${IMAGE_REF}"' "${OS_RELEASE_YML}"
+}
+
+@test "identity: the generator writes image-info.json with the ublue fields" {
+    grep -Fq '"image-name"' "${OS_RELEASE_YML}"
+    grep -Fq '"image-ref"' "${OS_RELEASE_YML}"
+    grep -Fq '"image-vendor"' "${OS_RELEASE_YML}"
+    grep -Fq '"image-tag"' "${OS_RELEASE_YML}"
+}
+
+@test "identity: the OCI ref.name matches the IMAGE_REF owner and name" {
+    grep -Fq "'org.opencontainers.image.ref.name': 'ghcr.io/%{image-vendor}/%{project-name}:latest'" "${OCI_IMAGE}"
 }

@@ -10,6 +10,7 @@ kind: stack
 
 depends:
   - image/deps.bst
+  - oci/os-release.bst
 
   - freedesktop-sdk.bst:components/linux-firmware.bst
   - gnome-build-meta.bst:gnomeos/initramfs/signed-modules.bst

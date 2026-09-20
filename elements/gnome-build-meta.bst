@@ -27,3 +27,5 @@ config:
     # Use our pinned plugin junctions so the whole graph agrees on versions.
     plugins/buildstream-plugins.bst: plugins/buildstream-plugins.bst
     plugins/buildstream-plugins-community.bst: plugins/buildstream-plugins-community.bst
+    # Use our os-release, so the image carries frameless's identity.
+    oci/integration/os-release.bst: oci/os-release.bst
