@@ -158,6 +158,29 @@ jobs:
           echo "version=${VERSION_LABEL}" >> "${GITHUB_OUTPUT}"
           echo "Version: ${VERSION_LABEL}"
 
+      # The image bakes its own upgrade origin (IMAGE_REF) from
+      # image-registry-owner in project.conf. If that does not match where CI
+      # publishes, `bootc upgrade` points at a repository that does not exist,
+      # and nothing else would catch it. Fail here instead.
+      - name: Verify the upgrade origin matches the publish target
+        shell: bash
+        env:
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          DEFAULT_TAG: ${{ env.DEFAULT_TAG }}
+          IMAGE_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+        run: |
+          set -euo pipefail
+          ref="localhost/${IMAGE_NAME}:${DEFAULT_TAG}"
+          mount=$(sudo podman image mount "${ref}")
+          trap 'sudo podman image umount "${ref}" >/dev/null 2>&1 || true' EXIT
+          actual=$(sed -n 's/^IMAGE_REF="\(.*\)"$/\1/p' "${mount}/usr/lib/os-release")
+          expected="ostree-image-signed:docker://${IMAGE_REGISTRY}/${IMAGE_NAME}"
+          if [ "${actual}" != "${expected}" ]; then
+            echo "::error::the image's upgrade origin is '${actual}' but CI publishes to '${expected}'. Set image-vendor in project.conf to '${IMAGE_REGISTRY##*/}'."
+            exit 1
+          fi
+          echo "Upgrade origin matches the publish target: ${actual}"
+
       - name: Generate tags
         id: generate-tags
         uses: projectbluefin/actions/bootc-build/generate-tags@9e1acbe66ec87cd07b573e1671a3ecaee7df73d0 # v1

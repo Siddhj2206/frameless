@@ -39,6 +39,16 @@ project_repo_url() { sed -n 's/^  image-repo-url: //p' "${PROJECT_CONF}" | tr -d
     grep -Fq 'IMAGE_REF: "ostree-image-signed:docker://ghcr.io/%{image-vendor}/%{project-name}"' "${OS_RELEASE_YML}"
 }
 
+@test "identity: the vendor is a valid registry path segment" {
+    local vendor
+    vendor="$(project_vendor)"
+    [ -n "${vendor}" ]
+    # The vendor is the first segment of the image reference, so it must be
+    # lowercase and hold no slash.
+    [ "$(printf '%s' "${vendor}" | tr '[:upper:]' '[:lower:]')" = "${vendor}" ]
+    [[ "${vendor}" != */* ]]
+}
+
 @test "identity: the os-release generator does not hardcode the project name" {
     local name
     name="$(project_name)"

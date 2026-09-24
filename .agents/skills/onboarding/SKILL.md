@@ -30,8 +30,9 @@ before. Substitute your own `{owner}/{repo}` throughout.
 
 See the Quick start in [README.md](../../../README.md#quick-start). The identity
 is literal only in `project.conf` — `name`, and `image-vendor`,
-`image-description`, `image-repo-url`, `image-code-name` under `variables:`;
-`just test-contract` fails if the identity drifts.
+`image-description`, `image-repo-url`, `image-code-name` under `variables:`.
+`image-vendor` must be your GitHub owner (lowercased) or the build fails on the
+upgrade-origin check; `just test-contract` fails if the identity drifts.
 
 ## 2. Enable Actions
 
