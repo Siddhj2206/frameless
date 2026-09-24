@@ -28,9 +28,10 @@ before. Substitute your own `{owner}/{repo}` throughout.
 
 ## 1. Rename the project
 
-See the Quick start in [README.md](../../../README.md#quick-start). The name is
-literal only in `project.conf`; `just test-contract` fails if the identity
-drifts.
+See the Quick start in [README.md](../../../README.md#quick-start). The identity
+is literal only in `project.conf` — `name`, and `image-vendor`,
+`image-description`, `image-repo-url`, `image-code-name` under `variables:`;
+`just test-contract` fails if the identity drifts.
 
 ## 2. Enable Actions
 

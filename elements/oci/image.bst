@@ -102,7 +102,7 @@ config:
             'org.opencontainers.image.vendor': '%{image-vendor}'
             'org.opencontainers.image.version': '%{fsdk-version}'
             'org.opencontainers.image.licenses': 'Apache-2.0'
-            'org.opencontainers.image.source': 'https://github.com/Siddhj2206/frameless'
+            'org.opencontainers.image.source': '%{image-repo-url}'
             'containers.bootc': '1'
         index-annotations:
           'org.opencontainers.image.ref.name': 'ghcr.io/%{image-vendor}/%{project-name}:latest'

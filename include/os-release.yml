@@ -30,12 +30,14 @@ environment:
   IMAGE_VERSION: "%{fsdk-version}"
 
   IMAGE_PRETTY_NAME: "%{project-name}"
-  HOME_URL: "https://github.com/Siddhj2206/frameless"
-  DOCUMENTATION_URL: "https://github.com/Siddhj2206/frameless/blob/main/README.md"
-  SUPPORT_URL: "https://github.com/Siddhj2206/frameless/issues"
-  BUG_REPORT_URL: "https://github.com/Siddhj2206/frameless/issues/new"
-  CODE_NAME: "frameless"
-  ID: "frameless"
+  # The four URLs derive from one project.conf variable, so a fork changes its
+  # repository once rather than restating the links here.
+  HOME_URL: "%{image-repo-url}"
+  DOCUMENTATION_URL: "%{image-repo-url}/blob/main/README.md"
+  SUPPORT_URL: "%{image-repo-url}/issues"
+  BUG_REPORT_URL: "%{image-repo-url}/issues/new"
+  CODE_NAME: "%{image-code-name}"
+  ID: "%{project-name}"
   ID_LIKE: "org.gnome.os"
 
 config:

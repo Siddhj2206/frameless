@@ -46,11 +46,13 @@ _Last updated: [date]_
 ## Quick start
 
 1. **Create your repository** — "Use this template" on GitHub.
-2. **Rename the project.** The name is literal only in `project.conf`:
-   `name:` is the image name, and `image-vendor` / `image-description` are under
-   `variables:`. Everything else reads them by reference, so `just test-contract`
-   fails if they drift. Grep for `frameless` afterwards to catch the prose and
-   the examples.
+2. **Rename the project.** The identity is literal only in `project.conf`:
+   `name:` is the image name, and `image-vendor`, `image-description`,
+   `image-repo-url` and `image-code-name` are under `variables:`. The os-release
+   URLs and the OCI source label all derive from `image-repo-url`, so a fork
+   changes it once. Everything else reads them by reference, and
+   `just test-contract` fails if they drift. Grep for `frameless` afterwards to
+   catch the prose and the examples.
 3. **Finish setup.** [The `onboarding` skill](.agents/skills/onboarding/SKILL.md)
    carries the rest — enabling Actions, auto-merge and workflow permissions, the
    Renovate token, the `stable` branch, branch protection, and the labels. Every
