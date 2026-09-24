@@ -129,6 +129,9 @@ jobs:
           BUILD_IMAGE_TAG: ${{ env.DEFAULT_TAG }}
           OCI_IMAGE_CREATED: ${{ steps.timestamp.outputs.created }}
           OCI_IMAGE_REVISION: ${{ github.sha }}
+          # Cap parallel jobs; an unbounded build exhausts the runner's process
+          # limit. See buildstream.conf.
+          BST_FLAGS: "--config /src/buildstream.conf"
         run: |
           set -euo pipefail
           # `just export` builds oci/image.bst, loads the OCI layout into podman,
