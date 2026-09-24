@@ -541,13 +541,13 @@ track *ELEMENTS:
     #!/usr/bin/env bash
     set -euo pipefail
     elements=(
-        elements/freedesktop-sdk.bst
-        elements/gnome-build-meta.bst
-        elements/plugins/buildstream-plugins.bst
-        elements/plugins/buildstream-plugins-community.bst
-        elements/runtime/common.bst
-        elements/runtime/brew.bst
-        elements/runtime/brew-tarball.bst
+        freedesktop-sdk.bst
+        gnome-build-meta.bst
+        plugins/buildstream-plugins.bst
+        plugins/buildstream-plugins-community.bst
+        runtime/common.bst
+        runtime/brew.bst
+        runtime/brew-tarball.bst
     )
     if [ "$#" -gt 0 ]; then
         elements=("$@")

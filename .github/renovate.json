@@ -23,6 +23,7 @@
       "matchStrings": [
         "export\\s+\\w+\\s*:=\\s*env\\(\"[^\"]+\",\\s*\"(?<packageName>[^\\s:@\"]+)@(?<currentDigest>sha256:[a-f0-9]+)\"\\)"
       ],
+      "currentValueTemplate": "latest",
       "datasourceTemplate": "docker",
       "versioningTemplate": "docker"
     },
