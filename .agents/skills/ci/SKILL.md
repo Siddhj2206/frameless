@@ -61,10 +61,15 @@ the pinned bst2 container, then loads the OCI layout into podman
 There is no Containerfile anywhere in the repository.
 
 
-Caching: `project.conf` lists the public read-only artifact caches for the
-FSDK/GBM graph, and the workflow persists the local `~/.cache/buildstream` with
-`actions/cache` so our own elements are not rebuilt every run. A writable remote
-cache is the follow-up — see `docs/research/06-ci-caching-personal-account.md`.
+Caching: `project.conf` lists three public **read-only** caches (gbm.gnome.org,
+cache.projectbluefin.io, cache.freedesktop-sdk.io) that we pull from and never
+push to. Our own artifacts are persisted with `actions/cache` on
+`~/.cache/buildstream`, with `save-always: true` — without it the post-step only
+writes the cache when the job succeeds, so a failed build caches nothing. Two
+limits remain: GitHub caps a repository's cache at 10 GB (a full GNOME CAS is
+larger, so the cache is partial), and there is no writable remote CAS as dakota
+has. A writable cache is the follow-up —
+`docs/research/06-ci-caching-personal-account.md`.
 
 `validate-bst.yml` runs `bst show oci/image.bst --deps none`. It loads the whole
 graph without building, so a load error fails in minutes rather than in the

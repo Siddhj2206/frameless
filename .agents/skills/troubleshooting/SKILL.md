@@ -28,6 +28,9 @@ CI runs the same checks; running them locally only makes the pull request quiet.
 | `Unexpected key: …` from an `(@)` include | the include was merged at the element top level | merge it into `variables:` — `variables: (@): [include/fsdk-version.yml]` |
 | `Unexpected key: …` in `project.conf` | a variable was written outside `variables:` | move it under `variables:` |
 | an element cannot find `sh`, `cp`, or `mkdir` | freedesktop-sdk 26.08's `runtime-minimal` carries no shell | `build-depends: core/sandbox-tools.bst` |
+| `ninja: fatal: posix_spawn: Resource temporarily unavailable` | unbounded parallel jobs exhaust the runner's process limit | cap them in `buildstream.conf` (`scheduler.builders`, `build.max-jobs`) |
+| an SDK element (`sdk/gtk`, `sdk/webkit2gtk`) rebuilds from source | the graph diverged from the public caches | make the junction match gnome-build-meta exactly: the `patches/freedesktop-sdk` queue and every override |
+| builds never get warmer; no `bst-*` cache exists | `actions/cache` only saves when the job succeeds | set `save-always: true` |
 | `Overlaps detected` between two elements | both install the same path | add it to one element's `public.bst.overlap-whitelist` |
 | a build command works locally but fails on CI | the remote sandbox differs (no `/dev/stdin`, no network) | write to a file instead of `/dev/stdin`; declare every build input |
 | a change rebuilds the world | the change invalidated a widely-depended-on element | expected; the graph is content-addressed. Build the one element first |
@@ -41,6 +44,7 @@ cheapest diagnostics. `just bst artifact delete <element>` drops a bad artifact.
 |---|---|---|
 | `validate` never runs | branch protection names a check no workflow produces | the context must be exactly `validate` |
 | `validate-bst` fails | the graph does not load | run `just bst show oci/image.bst --deps none` locally |
+| the build is slow and never seems to cache | there is no writable remote CAS, and GitHub's cache cap is 10 GB | expected on a personal account; see `docs/research/06-ci-caching-personal-account.md` |
 | Renovate opens nothing | `RENOVATE_TOKEN` is missing or lacks the `workflow` scope | recreate the token |
 | the promotion PR never opens | `stable` does not exist | create the branch |
 | the promotion PR will not merge | `stable` requires an approval | set required approvals to 0 |
