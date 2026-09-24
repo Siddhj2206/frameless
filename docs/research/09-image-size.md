@@ -113,10 +113,13 @@ Two mechanics worth remembering before attempting any of these:
 
 ## Also worth recording
 
-The build telemetry reports **uncompressed** size only. The compressed figure —
-what users download — is the one that matters for a "how big is our image"
-question, and it is not currently surfaced. Adding it to the summary would need
-either `skopeo inspect` on the pushed manifest or a sum of `podman push` output.
+The build telemetry originally reported **uncompressed** size only. The
+compressed figure — what users download — is the one that matters for a "how big
+is our image" question. The `Telemetry` step in `build-image.yml` now reads the
+pushed manifest back with `skopeo inspect --raw` (skopeo is installed by
+`setup-runner`) and sums its layer sizes, referenced by the push digest so a
+concurrent push cannot change what is measured. Both figures and the layer count
+appear in the job summary.
 
 ## Sources
 
