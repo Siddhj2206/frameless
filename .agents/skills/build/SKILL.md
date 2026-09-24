@@ -1,67 +1,82 @@
 ---
 name: build
 description: >-
-  The Containerfile, Justfile, build phases, image pinning, and the example
-  scripts. Use when changing how the image is assembled or activating an
-  example.
+  The BuildStream graph and the local loop: project.conf, junctions, the image
+  layers, the Justfile recipes, identity and versioning. Use when changing how
+  the image is assembled or running a build locally.
 ---
 
 # Build
 
-## The Containerfile
+## The graph
 
-It is the source of truth for image assembly, and it is written to be read. Its
-structure, in order:
+`project.conf` is the source of truth for the project. It sets `min-version`,
+the `arch` option, the identity variables, the read-only public caches, the
+plugin junctions, and `defaults.targets` (the OCI image).
 
-1. **Identity** — `ARG IMAGE_NAME`, `IMAGE_VENDOR`, `UBLUE_IMAGE_TAG`, and the
-   `# Name:` comment. The name actually published is the repository name; these
-   are the local fallback and the image metadata.
-2. **Context stage** — `COPY build /build`, `COPY custom /custom`, then the two
-   OCI images into `/oci/common` and `/oci/brew`.
-3. **Base** — the `FROM` line. The only place the base is chosen; the Fedora
-   major, the image name, and the digest all follow from it.
-4. **Phases** — one `RUN` block per script, in the order they are named.
-   [build/README.md](../../../build/README.md) lists them.
-5. **Metadata** — the `LABEL` block, fed by ARGs declared late so a new version
-   or commit only invalidates the label layer.
+The two junctions are pinned in their own elements. Their `track`/`ref` pairs are
+the base pin; `Renovate` moves them. Bumping a junction moves the image version
+with it (see Versioning).
 
-Order matters for cache: volatile values go after the expensive layers.
+| Layer | Element | Swap it for |
+| --- | --- | --- |
+| Desktop | `desktop/gnome.bst` | KDE, niri, or a freedesktop-sdk stack (no GUI) |
+| Runtime | `ublue/*.bst` | nothing, or your own runtime elements |
+| Adopter | `custom/custom.bst` | — (this is the point) |
+| Base OS | the freedesktop-sdk junction | another OS junction |
+
+Adding image content is a line in `elements/image/deps.bst`. Never add content by
+editing a built artifact.
+
+## The local loop
+
+`bst` is not installed locally; `just bst` runs it in the pinned container.
+
+```bash
+just bst show oci/image.bst --deps none   # load the graph, no build
+just build                                # build + load the OCI image into podman
+just generate-bootable-image              # install it to bootable.raw via bootc
+just boot-vm                              # boot that disk in QEMU
+```
+
+`just export` (which `just build` calls) checks out the built OCI layout, loads
+it into podman as `{{image_name}}:{{image_tag}}`, and applies provenance labels.
+It does not touch the graph.
+
+The `bst` recipe regenerates `include/fsdk-version.yml` from the FSDK junction ref
+on every invocation, so elements can read `%{fsdk-version}`.
+
+## Identity and versioning
+
+Identity is literal only in `project.conf`. `include/os-release.yml` writes
+`/usr/lib/os-release`, symlinks `/etc/os-release`, and writes the ublue
+`image-info.json`, reading the project name and vendor by reference. The
+gnome-build-meta junction overrides its own os-release element with ours.
+
+The version is parsed from the FSDK junction ref (`just fsdk_version`) into
+`%{fsdk-version}`; os-release and the OCI label read it. `just tags` prints the
+minor stream and the exact release.
 
 ## The Justfile
 
-```bash
-just build            # build the image
-just build-qcow2      # build a QCOW2 disk image
-just build-iso        # build an installer ISO
-just run-vm-qcow2     # boot the image in a VM
-just test-unit        # run the suite
-just lint             # shellcheck every tracked script
-just check            # verify Justfile syntax
+Groups: `info`, `build`, `run`, `test`, `dev`. `just --list` shows them all.
+`just bst` is the only recipe that talks to BuildStream; everything else wraps
+it or the resulting image.
+
+## Two rules that cost hours
+
+- **`min-version` and the pinned `bst2` container are one decision.** The project
+  needs a BuildStream at least as new as `min-version`; the container provides it.
+- **Run `just bst show` before `just bst build`.** It catches graph errors in
+  seconds. CI does this in `validate-bst.yml`.
+
+## Removing an upstream element that cannot load
+
+Override it at the junction rather than patching it:
+
+```yaml
+overrides:
+  gnomeos/initramfs/signed-modules.bst: kernel/unsigned-modules.bst
 ```
 
-`just --list` has the rest. `IMAGE_NAME` defaults to the value in the Justfile
-and is overridable by the `IMAGE_NAME` environment variable; CI sets that from
-the repository name.
-
-## Pinning
-
-Every OCI reference is pinned by digest and updated by Renovate: the base image,
-`projectbluefin/common`, `ublue-os/brew`, `bootc-image-builder`, and the GitHub
-Actions. Do not hand-edit a digest; let Renovate propose it.
-
-The base image's `FROM` line is the only place the base is chosen, so the Fedora
-major cannot desync the way a hand-maintained `FEDORA_MAJOR_VERSION` ARG could.
-Two readers derive it from that base: `just build` parses the tag for the version
-string, and `00-image-info.sh` reads the base's `os-release` for the image
-metadata.
-
-`BASE_IMAGE_NAME` has no default in the Containerfile on purpose: a stale default
-like `silverblue` would silently mislabel a CentOS or Hummingbird fork. `just
-build` fills it from the `FROM` line and `00-image-info.sh` hard-fails on an empty
-value, so build through `just`; a bare `podman build .` is unsupported.
-
-## Examples
-
-`build/*.sh.example` are inactive until you activate them: rename the file off
-`.example` and add a `RUN` block after the package phase.
-[build/README.md](../../../build/README.md) has the block to copy.
+See `elements/gnome-build-meta.bst` for the live examples.

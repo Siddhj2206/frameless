@@ -49,8 +49,7 @@ jobs:
           echo "The promotion tree matches main."
 
       # The repository's shell scripts are the *.sh files git tracks — the same
-      # definition `just lint` uses. validate-pr word-splits this input into
-      # shellcheck arguments.
+      # definition `just lint` uses.
       - name: Resolve shellcheck scope
         id: shell-scope
         shell: bash
@@ -59,9 +58,30 @@ jobs:
           echo "glob=${glob}" >> "${GITHUB_OUTPUT}"
           echo "Resolved shellcheck scope: ${glob}"
 
-      - name: Validate
-        uses: projectbluefin/actions/bootc-build/validate-pr@722bdf2e7fda6d5fac91c78c6ed396d7cf9a8dc5 # v1
-        with:
-          shellcheck-glob: ${{ steps.shell-scope.outputs.glob }}
-          dockerfile: "Containerfile"
-          hadolint-config: ".github/hadolint.yaml"
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v3
+
+      - name: Install shellcheck and pre-commit
+        shell: bash
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y shellcheck
+          pip install 'pre-commit==4.6.0'
+
+      - name: Check Just syntax
+        shell: bash
+        run: just check
+
+      - name: Shellcheck
+        shell: bash
+        env:
+          SHELLCHECK_GLOB: ${{ steps.shell-scope.outputs.glob }}
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          # shellcheck disable=SC2086
+          shellcheck ${SHELLCHECK_GLOB}
+
+      - name: Run pre-commit
+        shell: bash
+        run: pre-commit run --all-files

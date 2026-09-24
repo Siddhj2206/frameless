@@ -2,8 +2,8 @@
 name: troubleshooting
 description: >-
   Symptom to cause to fix for build, CI, and runtime failures, plus the
-  pre-commit checklist. Use when something is broken or before opening a
-  pull request.
+  pre-commit checklist. Use when something is broken or before opening a pull
+  request.
 ---
 
 # Troubleshooting
@@ -15,7 +15,7 @@ description: >-
 - [ ] `just check` — Justfile syntax.
 - [ ] `just test-unit` — the suite.
 - [ ] `just validate-brewfiles` / `just validate-flatpaks` if those changed.
-- [ ] `just build` if the image changed.
+- [ ] `just bst show oci/image.bst --deps none` if the graph changed.
 
 CI runs the same checks; running them locally only makes the pull request quiet.
 
@@ -23,16 +23,24 @@ CI runs the same checks; running them locally only makes the pull request quiet.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `bootc container lint` fails on a nonempty `/run` | a script wrote to `/run` into an image layer | remove it in `90-cleanup.sh`; that phase deliberately does not mount `/run` as tmpfs |
-| a third-party repository is live in the final image | a script enabled it and did not disable it | use `copr_install_isolated`, or disable it explicitly |
-| the package layer rebuilds on every overlay edit | packages drifted into the overlay phase | keep packages in `20-packages-and-services.sh` |
-| hadolint flags the Containerfile | a rule in `.github/hadolint.yaml` | fix it, or add a suppression with a reason |
+| `Version mismatch` at project load | `project.conf`'s `min-version` is newer than the BuildStream in the pinned `bst2` container | move them together: bump the container digest, or lower `min-version` |
+| `Specified path 'files/…' does not exist` at load | an upstream element needs a file that is not in the public repository | override that element at the junction with your own (see `kernel/unsigned-modules.bst`) |
+| `Unexpected key: …` from an `(@)` include | the include was merged at the element top level | merge it into `variables:` — `variables: (@): [include/fsdk-version.yml]` |
+| `Unexpected key: …` in `project.conf` | a variable was written outside `variables:` | move it under `variables:` |
+| an element cannot find `sh`, `cp`, or `mkdir` | freedesktop-sdk 26.08's `runtime-minimal` carries no shell | `build-depends: core/sandbox-tools.bst` |
+| `Overlaps detected` between two elements | both install the same path | add it to one element's `public.bst.overlap-whitelist` |
+| a build command works locally but fails on CI | the remote sandbox differs (no `/dev/stdin`, no network) | write to a file instead of `/dev/stdin`; declare every build input |
+| a change rebuilds the world | the change invalidated a widely-depended-on element | expected; the graph is content-addressed. Build the one element first |
+
+`just bst show <element>` and `just bst artifact log <element>` are the two
+cheapest diagnostics. `just bst artifact delete <element>` drops a bad artifact.
 
 ## CI
 
 | Symptom | Cause | Fix |
 |---|---|---|
 | `validate` never runs | branch protection names a check no workflow produces | the context must be exactly `validate` |
+| `validate-bst` fails | the graph does not load | run `just bst show oci/image.bst --deps none` locally |
 | Renovate opens nothing | `RENOVATE_TOKEN` is missing or lacks the `workflow` scope | recreate the token |
 | the promotion PR never opens | `stable` does not exist | create the branch |
 | the promotion PR will not merge | `stable` requires an approval | set required approvals to 0 |
@@ -40,12 +48,11 @@ CI runs the same checks; running them locally only makes the pull request quiet.
 
 ## Runtime
 
-The two most common first-boot surprises — no Flatpaks, and no `brew` — are in
-the README's Troubleshooting section.
-
 | Symptom | Cause | Fix |
 |---|---|---|
-| `ujust` shows no custom commands | `60-custom.just` was not written or imported | check that `10-overlay.sh` copied the recipes |
+| `ujust` shows no custom commands | `60-custom.just` was not written or imported | check that `custom/custom.bst` copied it and Common's `00-entry.just` imports it |
+| no Flatpaks on first boot | the preinstall service ran before the network | reboot once online; it does not retry that boot |
+| no `brew` | the tarball was not staged | check `ublue/brew-tarball.bst` built and `brew-setup.service` is present |
 
 ## Capturing what you learned
 

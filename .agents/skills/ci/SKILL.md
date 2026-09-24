@@ -15,7 +15,7 @@ description: >-
 | `execute-release.yml` | push to `stable` | Promotes the candidate digest. Does not rebuild. |
 | `promote-main-to-stable.yml` | daily schedule, dispatch | Opens the squash promotion PR and runs the release gate on it. |
 | `sync-stable-to-main.yml` | push to `stable` | Merges `stable` hotfixes back into `main`. |
-| `pr-validation.yml` | pull request | The `validate` check: shellcheck and hadolint. |
+| `pr-validation.yml` | pull request | The `validate` check: `just check`, shellcheck, pre-commit. |
 | `validate-bst.yml` | push, pull request (elements changed) | Loads the image graph with `bst show`. |
 | `validate-brewfiles.yml` | pull request | Brewfiles, without evaluating them. |
 | `validate-flatpaks.yml` | pull request | Flatpak preinstall files against Flathub. |
@@ -58,8 +58,8 @@ the one-line fix there is `--no-renames`.
 `build-image.yml` assembles the image with `just bst build oci/image.bst` inside
 the pinned bst2 container, then loads the OCI layout into podman
 (`podman pull -q oci:out`) so the shared tag/push/sign reusables are unchanged.
-There is no Containerfile in this path; the one still in the tree serves the local
-VM recipes until the VM/ISO ticket replaces it.
+There is no Containerfile anywhere in the repository.
+
 
 Caching: `project.conf` lists the public read-only artifact caches for the
 FSDK/GBM graph, and the workflow persists the local `~/.cache/buildstream` with
@@ -98,7 +98,7 @@ onboarding steps.
 Automerge deliberately covers GitHub Actions SHA bumps, which reverses a guard
 upstream kept. Those SHAs run in jobs holding `packages: write`,
 `id-token: write`, and `secrets: inherit`, and PR builds are disabled, so a bump
-merges with only shellcheck, hadolint, and the test suite having run. Putting the
+merges with only shellcheck, just check, and the test suite having run. Putting the
 guard back is one rule — `matchManagers: ["github-actions"]` with
 `automerge: false`.
 
