@@ -123,6 +123,13 @@ it or the resulting image.
   of truth; `just patch-sync` aligns the queue). Drift changes the cache key of
   every element beneath it, so the SDK rebuilds from source — see Caches and
   cache keys.
+- **Parity is not only the junction.** gnome-build-meta's CI *generates* files
+  before building — e.g. `files/boot-keys/modules/linux-module-cert.crt`, which
+  the kernel build-depends on with `strict: true`. A clean checkout lacks them,
+  so the element computes a key the public caches do not hold and rebuilds from
+  source while everything around it pulls. Reproduce the generated file with a
+  patch queue; `patches/gnome-build-meta` is the live example. Symptom: *one*
+  upstream element rebuilds although the junction matches exactly.
 
 ## Removing an upstream element that cannot load
 

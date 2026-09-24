@@ -30,6 +30,7 @@ CI runs the same checks; running them locally only makes the pull request quiet.
 | an element cannot find `sh`, `cp`, or `mkdir` | freedesktop-sdk 26.08's `runtime-minimal` carries no shell | `build-depends: core/sandbox-tools.bst` |
 | `ninja: fatal: posix_spawn: Resource temporarily unavailable` | unbounded parallel jobs exhaust the runner's process limit | cap them in `buildstream.conf` (`scheduler.builders`, `build.max-jobs`) |
 | an SDK element (`sdk/gtk`, `sdk/webkit2gtk`) rebuilds from source | the graph diverged from the public caches | make the junction match gnome-build-meta exactly: the `patches/freedesktop-sdk` queue and every override |
+| *one* upstream element rebuilds although the junction matches | its key depends on a file gnome-build-meta's CI generates at build time, which a clean checkout lacks | reproduce that file with a patch queue (see `patches/gnome-build-meta` for the boot-key cert) |
 | builds never get warmer; no `bst-*` cache exists | `actions/cache` only saves when the job succeeds | set `save-always: true` |
 | `Overlaps detected` between two elements | both install the same path | add it to one element's `public.bst.overlap-whitelist` |
 | a build command works locally but fails on CI | the remote sandbox differs (no `/dev/stdin`, no network) | write to a file instead of `/dev/stdin`; declare every build input |
