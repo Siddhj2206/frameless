@@ -7,7 +7,7 @@
 #
 # Read it top to bottom:
 #   desktop/   the desktop — swap this element for KDE, niri, or nothing
-#   ublue/     the bundled ublue runtime (ujust, Homebrew, first-boot)
+#   runtime/     the bundled ublue runtime (ujust, Homebrew, first-boot)
 #   custom/    your own declarations, from the custom/ directory
 ###############################################################################
 kind: stack
@@ -19,10 +19,10 @@ depends:
   - gnome-build-meta.bst:gnomeos-deps/just.bst
 
   # ── ublue runtime ──────────────────────────────────────────────────────
-  - ublue/common.bst
-  - ublue/brew.bst
-  - ublue/brew-tarball.bst
-  - ublue/firstboot.bst
+  - runtime/common.bst
+  - runtime/brew.bst
+  - runtime/brew-tarball.bst
+  - runtime/firstboot.bst
 
   # ── adopter declarations ───────────────────────────────────────────────
   - custom/custom.bst

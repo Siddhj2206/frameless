@@ -23,7 +23,7 @@ The graph has four layers, and the default target is the OCI image:
 elements/oci/image.bst                     the default target (kind: script)
   └── elements/image/deps.bst              the manifest (kind: stack)
         ├── elements/desktop/gnome.bst     the desktop        — swap for KDE/niri/none
-        ├── elements/ublue/*.bst           the ublue runtime  — ujust, brew, firstboot
+        ├── elements/runtime/*.bst           the ublue runtime  — ujust, brew, firstboot
         └── elements/custom/custom.bst     your declarations  — from custom/
 ```
 
@@ -45,7 +45,7 @@ the FSDK junction ref.
 |---|---|
 | `project.conf` | The project: name, `min-version`, junctions, options, caches, default target. |
 | `Justfile` | `just bst` and the local loop: build, export, boot a VM, tests. |
-| `elements/` | The graph. `desktop/`, `ublue/`, `custom/`, `oci/`, `core/`, `kernel/`, plus the junctions. |
+| `elements/` | The graph. `desktop/`, `runtime/`, `custom/`, `oci/`, `core/`, `kernel/`, plus the junctions. |
 | `include/` | Shared YAML merged with `(@)`: aliases, os-release, the generated version. |
 | `files/` | Local source payloads (first-boot units, service overrides). |
 | `scripts/` | Repository tooling: the Brewfile and Flatpak validators. |
@@ -73,7 +73,7 @@ The template consumes upstream rather than copying it:
 - `freedesktop-sdk` — the OS, via a junction.
 - `gnome-build-meta` — the desktop, via a junction (swap it for another desktop).
 - `projectbluefin/common` and `ublue-os/brew` — the ublue runtime, as git and
-  docker sources in `elements/ublue/`.
+  docker sources in `elements/runtime/`.
 - `projectbluefin/actions` — the reusable CI workflows.
 
 Changes stay in this repository. `ublue-os/*` is read-only.

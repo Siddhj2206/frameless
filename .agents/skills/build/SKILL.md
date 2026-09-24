@@ -21,7 +21,7 @@ with it (see Versioning).
 | Layer | Element | Swap it for |
 | --- | --- | --- |
 | Desktop | `desktop/gnome.bst` | KDE, niri, or a freedesktop-sdk stack (no GUI) |
-| Runtime | `ublue/*.bst` | nothing, or your own runtime elements |
+| Runtime | `runtime/*.bst` | nothing, or your own runtime elements |
 | Adopter | `custom/custom.bst` | — (this is the point) |
 | Base OS | the freedesktop-sdk junction | another OS junction |
 

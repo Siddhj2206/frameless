@@ -1,6 +1,6 @@
 # The ublue runtime layer, and two load blockers
 
-Established the bundled ublue runtime as `elements/ublue/{common,brew,brew-tarball,firstboot}.bst`
+Established the bundled ublue runtime as `elements/runtime/{common,brew,brew-tarball,firstboot}.bst`
 plus `core/sandbox-tools.bst` and the `custom/custom.bst` seam, following
 finpilot's split: `common`'s `shared/` half only, never `bluefin/`'s product
 opinion. All six elements build and their artifacts were checked out and

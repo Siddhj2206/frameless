@@ -30,7 +30,7 @@ There is no `dnf`. The image is assembled from BuildStream elements; a package
 is an element in the `elements/image/deps.bst` stack, or a `kind: manual`
 element that installs one. Prefer an element the base already provides:
 `gnome-build-meta.bst:gnomeos-deps/…` and `freedesktop-sdk.bst:components/…`
-carry most of what a desktop needs. `elements/ublue/` shows the shape of a
+carry most of what a desktop needs. `elements/runtime/` shows the shape of a
 manual element that copies an upstream project's files.
 
 Editing the stack is editing `elements/image/deps.bst`; never add content by

@@ -51,7 +51,7 @@ elements/
   plugins/                junction — the BuildStream plugin packages
   core/sandbox-tools.bst  shared build-sandbox shell
   desktop/gnome.bst       the desktop layer (swap this for KDE/niri/none)
-  ublue/                  the bundled ublue runtime
+  runtime/                  the bundled ublue runtime
   custom/custom.bst       your own declarations, from custom/
   oci/image.bst           the default target: the OCI image
 include/                  shared YAML fragments, merged with (@)
@@ -71,9 +71,9 @@ custom/                   where an adopter changes the image
 | Build one element | `just bst build oci/os-release.bst` |
 | Build the image | `just build` |
 | Check out an element's artifact | `just bst artifact checkout oci/image.bst --directory /src/out` |
-| Read a build log | `just bst artifact log ublue/common.bst` |
-| Drop a cached artifact | `just bst artifact delete ublue/common.bst` |
-| Enter a build sandbox | `just bst shell --build ublue/common.bst` |
+| Read a build log | `just bst artifact log runtime/common.bst` |
+| Drop a cached artifact | `just bst artifact delete runtime/common.bst` |
+| Enter a build sandbox | `just bst shell --build runtime/common.bst` |
 
 When passing `--format`, avoid spaces — the Justfile recipe word-splits its
 arguments. Use a separator like `--`.

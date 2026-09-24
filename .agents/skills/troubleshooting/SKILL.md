@@ -52,7 +52,7 @@ cheapest diagnostics. `just bst artifact delete <element>` drops a bad artifact.
 |---|---|---|
 | `ujust` shows no custom commands | `60-custom.just` was not written or imported | check that `custom/custom.bst` copied it and Common's `00-entry.just` imports it |
 | no Flatpaks on first boot | the preinstall service ran before the network | reboot once online; it does not retry that boot |
-| no `brew` | the tarball was not staged | check `ublue/brew-tarball.bst` built and `brew-setup.service` is present |
+| no `brew` | the tarball was not staged | check `runtime/brew-tarball.bst` built and `brew-setup.service` is present |
 
 ## Capturing what you learned
 

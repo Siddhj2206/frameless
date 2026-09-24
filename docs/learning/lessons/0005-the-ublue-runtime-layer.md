@@ -6,7 +6,7 @@ between the platform and the product runs.
 
 ## What "the ublue runtime" is
 
-Four pieces, each an element under `elements/ublue/`:
+Four pieces, each an element under `elements/runtime/`:
 
 | Element | Upstream | Brings |
 | --- | --- | --- |

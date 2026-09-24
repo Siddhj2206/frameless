@@ -3,7 +3,7 @@
 ###############################################################################
 # Copies ublue-os/brew's `system_files`: the brew-setup/brew-update units and
 # the managed-prefix helpers. The Homebrew tree itself comes from
-# ublue/brew-tarball.bst, which runtime-depends on this element.
+# runtime/brew-tarball.bst, which runtime-depends on this element.
 ###############################################################################
 kind: manual
 

@@ -4,7 +4,7 @@
 # Stages the Homebrew tree so it exists on first boot without a download.
 # The docker source pins the per-architecture manifest digest, not the
 # multi-arch index digest, so each arch carries its own ref; track with
-#   just bst -o arch <arch> source track ublue/brew-tarball.bst
+#   just bst -o arch <arch> source track runtime/brew-tarball.bst
 ###############################################################################
 kind: manual
 
@@ -23,7 +23,7 @@ build-depends:
   - freedesktop-sdk.bst:public-stacks/runtime-minimal.bst
 
 runtime-depends:
-  - ublue/brew.bst
+  - runtime/brew.bst
 
 variables:
   strip-binaries: ""
