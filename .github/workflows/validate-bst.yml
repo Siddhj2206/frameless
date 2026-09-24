@@ -1,0 +1,48 @@
+---
+name: Validate BuildStream
+
+# The cheap gate for the image graph. `bst show` loads every element without
+# building, so a load error fails here in minutes rather than in the six-hour
+# image build. This is the gate that catches the two blockers found while
+# wiring the ublue runtime layer: a min-version/runner mismatch, and an upstream
+# element (gnome-build-meta's signed-modules) whose private signing key is absent
+# from the public repository and so cannot load in any fork.
+on:
+  pull_request:
+    branches: [main, stable]
+    paths:
+      - "elements/**"
+      - "include/**"
+      - "project.conf"
+      - "Justfile"
+      - ".github/workflows/validate-bst.yml"
+  push:
+    branches: [main, stable]
+    paths:
+      - "elements/**"
+      - "include/**"
+      - "project.conf"
+      - "Justfile"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  graph:
+    name: Image graph loads
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # `just bst` runs bst in the pinned bst2 container, which needs podman and
+      # /dev/fuse; the ubuntu runner has both. It also regenerates
+      # include/fsdk-version.yml from the FSDK junction ref.
+      - name: Load the image graph
+        run: just bst show oci/image.bst --deps none

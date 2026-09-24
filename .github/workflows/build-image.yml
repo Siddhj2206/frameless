@@ -8,17 +8,23 @@ name: Build and Push Image
 # promote-main-to-stable.yml opens the scheduled/manual main -> stable promotion
 # PR. execute-release.yml runs the release gate and promotes the candidate.
 #
-# Builds run on push to main only; PR builds are disabled. A change to a
-# workflow the build depends on — build-image, promote, unit tests — still
-# builds, so a break in it is caught. The four validate workflows are PR
-# linting only and never affect the image.
+# The image is assembled by BuildStream, not a Containerfile: `just bst` runs bst
+# in the pinned freedesktop-sdk bst2 container and the resulting OCI layout is
+# loaded into podman, so the shared tag/push/sign reusables keep working
+# unchanged. See docs/research/05-local-bst-runner.md and
+# docs/research/07-dakota-alpha-6.md.
 on:
   push:
     branches:
       - main
-    paths-ignore:
-      - "**.md"
-      - ".github/workflows/*validate*.yml"
+    paths:
+      - "elements/**"
+      - "include/**"
+      - "files/**"
+      - "custom/**"
+      - "project.conf"
+      - "Justfile"
+      - ".github/workflows/build-image.yml"
   workflow_dispatch:
 
 permissions:
@@ -31,12 +37,11 @@ env:
   IMAGE_NAME: "${{ github.event.repository.name }}"
   IMAGE_VENDOR: "${{ github.repository_owner }}"
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
-  # Image description, keywords and logo are the Containerfile's ARGs, so CI and
-  # local builds agree. Set IMAGE_DESC, IMAGE_KEYWORDS, IMAGE_LOGO_URL or
-  # IMAGE_REF here only to override the Containerfile deliberately.
   DEFAULT_TAG: "stable"
   PRODUCTION_BRANCH: "stable" # The branch that publishes :stable production images
-  REGISTRY_CACHE_WRITE: "1" # CI always writes the layer cache; local builds stay read-only
+  # Rechunking is available through the shared OCI-native chunka action and is
+  # off by default. The build-time chunkah-ownership pipeline is a separate
+  # decision — see docs/research/07-dakota-alpha-6.md.
   ENABLE_RECHUNKING: "false"
   RECHUNK_MAX_LAYERS: "128"
 
@@ -106,28 +111,36 @@ jobs:
           update-podman: "true"
           install-tools: '["just"]'
 
-      - name: Restore DNF cache
-        id: dnf-cache-restore
-        uses: projectbluefin/actions/bootc-build/dnf-cache@722bdf2e7fda6d5fac91c78c6ed396d7cf9a8dc5 # v1
+      # BuildStream's artifact cache. The public read-only caches in project.conf
+      # cover the FSDK/GBM graph; this persists what we build on top of it, so a
+      # run that only changes one element does not rebuild the world. The
+      # combined action restores here and saves in a post-step.
+      - name: BuildStream cache
+        uses: actions/cache@v4
         with:
-          action: restore
-          cache-name: ${{ env.IMAGE_NAME }}
-          cache-bust: ${{ hashFiles('**/Containerfile') }}
+          path: ~/.cache/buildstream
+          key: bst-${{ runner.os }}-${{ hashFiles('project.conf', 'elements/freedesktop-sdk.bst', 'elements/gnome-build-meta.bst') }}
+          restore-keys: |
+            bst-${{ runner.os }}-
 
-      - name: Build image
+      - name: Build image with BuildStream
         id: build-image
-        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
-          IMAGE_VENDOR: ${{ env.IMAGE_VENDOR }}
           DEFAULT_TAG: ${{ env.DEFAULT_TAG }}
-        with:
-          timeout_minutes: 120
-          max_attempts: 3
-          retry_wait_seconds: 300
-          command: |
-            sudo -E "$(command -v just)" build "${IMAGE_NAME}" "${DEFAULT_TAG}"
+        run: |
+          set -euo pipefail
+          # `just bst` runs bst in the pinned bst2 container and regenerates
+          # include/fsdk-version.yml from the FSDK junction ref.
+          just bst build oci/image.bst
+
+          # Export the OCI layout and load it into podman so the tag/push/sign
+          # reusables below operate on a normal local image. `podman pull` (not
+          # skopeo) keeps the loaded view intact for the push.
+          rm -rf out
+          just bst artifact checkout oci/image.bst --directory /src/out
+          IMAGE_ID=$(sudo podman pull -q oci:out)
+          sudo podman tag "${IMAGE_ID}" "localhost/${IMAGE_NAME}:${DEFAULT_TAG}"
 
       - name: Get version label
         id: version
@@ -152,10 +165,9 @@ jobs:
 
       # generate-tags emits stream-native tags (testing* or stable-daily* plus
       # version aliases). For testing builds this renames testing* tags to
-      # stable-testing-*, keeps the bare :testing tag (the factory release
-      # gate in reusable-promote-squash.yml resolves digests from it), and
-      # guarantees the mutable consumer tag (:stable / :stable-testing) is
-      # always published.
+      # stable-testing-*, keeps the bare :testing tag (the factory release gate
+      # in reusable-promote-squash.yml resolves digests from it), and guarantees
+      # the mutable consumer tag (:stable / :stable-testing) is always published.
       - name: Finalize branch tags
         id: branch-tags
         shell: bash
@@ -188,17 +200,10 @@ jobs:
           echo "tags=${branch_tags[*]}" >> "${GITHUB_OUTPUT}"
           echo "default-tag=${DEFAULT_TAG}" >> "${GITHUB_OUTPUT}"
 
-      - name: Save DNF cache
-        if: always() && !cancelled()
-        uses: projectbluefin/actions/bootc-build/dnf-cache@722bdf2e7fda6d5fac91c78c6ed396d7cf9a8dc5 # v1
-        with:
-          action: save
-          cache-name: ${{ env.IMAGE_NAME }}
-          allow-write: "true"
-          cache-bust: ${{ hashFiles('**/Containerfile') }}
-
-      # OPTIONAL: Set ENABLE_RECHUNKING to "true" above to optimize OTA deltas.
-      # This uses OCI-native chunkah and does not require bootc-base-imagectl.
+      # OPTIONAL: set ENABLE_RECHUNKING to "true" above for smaller OTA deltas.
+      # This is the shared OCI-native chunka action, which runs on the local
+      # image; the build-time chunkah-ownership pipeline alpha 6 uses is a
+      # separate decision (docs/research/07-dakota-alpha-6.md).
       - name: Rechunk image
         if: env.ENABLE_RECHUNKING == 'true'
         id: rechunk-image
@@ -230,12 +235,10 @@ jobs:
           default-tag: ${{ steps.branch-tags.outputs.default-tag }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # Sign and attest (SLSA Build L2 provenance)
-      # Bluefin pattern: keyless OIDC signing via Fulcio.
-      # Requires 'id-token: write' permission (granted above).
-      # Signing failures do not block candidate publication, but the release
-      # gate rejects an unsigned candidate and preserves the prior :stable.
-
+      # Sign and attest (SLSA Build L2 provenance). Bluefin pattern: keyless OIDC
+      # signing via Fulcio; requires 'id-token: write' (granted above). Signing
+      # failures do not block candidate publication, but the release gate rejects
+      # an unsigned candidate and preserves the prior :stable.
       - name: Sign and publish
         continue-on-error: true
         uses: projectbluefin/actions/bootc-build/sign-and-publish@722bdf2e7fda6d5fac91c78c6ed396d7cf9a8dc5 # v1

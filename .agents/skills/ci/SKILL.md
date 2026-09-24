@@ -11,11 +11,12 @@ description: >-
 
 | Workflow | Trigger | Does |
 |---|---|---|
-| `build-image.yml` | push to `main` or `stable`, dispatch | Builds, signs, and pushes the image. |
+| `build-image.yml` | push to `main`, dispatch | Builds with BuildStream, signs, and pushes the image. |
 | `execute-release.yml` | push to `stable` | Promotes the candidate digest. Does not rebuild. |
 | `promote-main-to-stable.yml` | daily schedule, dispatch | Opens the squash promotion PR and runs the release gate on it. |
 | `sync-stable-to-main.yml` | push to `stable` | Merges `stable` hotfixes back into `main`. |
 | `pr-validation.yml` | pull request | The `validate` check: shellcheck and hadolint. |
+| `validate-bst.yml` | push, pull request (elements changed) | Loads the image graph with `bst show`. |
 | `validate-brewfiles.yml` | pull request | Brewfiles, without evaluating them. |
 | `validate-flatpaks.yml` | pull request | Flatpak preinstall files against Flathub. |
 | `validate-justfiles.yml` | pull request | `just check`. |
@@ -52,6 +53,32 @@ the state the guard above refuses, but only after the PR is merged.
 whose tree does not match `main`. The sweep belongs to `projectbluefin/actions`;
 the one-line fix there is `--no-renames`.
 
+## The BuildStream build
+
+`build-image.yml` assembles the image with `just bst build oci/image.bst` inside
+the pinned bst2 container, then loads the OCI layout into podman
+(`podman pull -q oci:out`) so the shared tag/push/sign reusables are unchanged.
+There is no Containerfile in this path; the one still in the tree serves the local
+VM recipes until the VM/ISO ticket replaces it.
+
+Caching: `project.conf` lists the public read-only artifact caches for the
+FSDK/GBM graph, and the workflow persists the local `~/.cache/buildstream` with
+`actions/cache` so our own elements are not rebuilt every run. A writable remote
+cache is the follow-up — see `docs/research/06-ci-caching-personal-account.md`.
+
+`validate-bst.yml` runs `bst show oci/image.bst --deps none`. It loads the whole
+graph without building, so a load error fails in minutes rather than in the
+six-hour build. This is the gate that catches a junction bump whose upstream
+element cannot load in a fork (the `signed-modules` class of failure).
+
+## Versioning
+
+The image version comes from the FSDK junction ref. `just` parses it to
+`fsdk_version`, `just bst` writes `include/fsdk-version.yml`, and os-release and
+the OCI labels read `%{fsdk-version}`. `just tags` prints the minor stream
+(`26.08`) and the exact release (`26.08.1`). Bumping the junction moves the
+version; there is no second edit.
+
 ## Signing
 
 Keyless OIDC via Cosign. There are no keys to generate or store; the workflow
@@ -78,6 +105,6 @@ guard back is one rule — `matchManagers: ["github-actions"]` with
 ## Making a change
 
 1. Open a pull request against `main`.
-2. Wait for `validate` and the image build.
+2. Wait for `validate`, `validate-bst`, and the image build.
 3. Merge. `main` publishes `:stable-testing`.
 4. Review and merge the promotion PR to publish `:stable`.
