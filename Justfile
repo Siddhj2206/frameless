@@ -557,6 +557,84 @@ track *ELEMENTS:
         just bst source track "${element}"
     done
 
+# Re-sync patches/freedesktop-sdk (and its manifest) from gnome-build-meta at
+# the pinned junction sha, and write the manifest `patch-drift-check` verifies
+# offline. Run it after every gnome-build-meta junction bump.
+[group('dev')]
+patch-sync:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    gbm_ref=$(awk '/^[[:space:]]*ref: / { print $2; exit }' elements/gnome-build-meta.bst)
+    if [[ ! "$gbm_ref" =~ -g([0-9a-f]{40})$ ]]; then
+        echo "ERROR: could not extract the gnome-build-meta commit SHA from elements/gnome-build-meta.bst ref: ${gbm_ref}" >&2
+        exit 1
+    fi
+    export gbm_sha="${BASH_REMATCH[1]}"
+
+    files_api="https://gitlab.gnome.org/api/v4/projects/GNOME%2Fgnome-build-meta/repository/files"
+    tree_api="https://gitlab.gnome.org/api/v4/projects/GNOME%2Fgnome-build-meta/repository/tree?path=patches/freedesktop-sdk&ref=${gbm_sha}&per_page=100"
+    mapfile -t patch_files < <(curl -fsSL "$tree_api" \
+        | python3 -c 'import json, sys; [print(i["name"]) for i in json.load(sys.stdin) if i["type"] == "blob"]')
+    if [ "${#patch_files[@]}" -eq 0 ]; then
+        echo "ERROR: empty patches/freedesktop-sdk listing at gnome-build-meta @ ${gbm_sha}" >&2
+        exit 1
+    fi
+    mkdir -p patches/freedesktop-sdk
+    rm -f patches/freedesktop-sdk/*
+    for f in "${patch_files[@]}"; do
+        encoded=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$f")
+        curl -fsSL "${files_api}/patches%2Ffreedesktop-sdk%2F${encoded}/raw?ref=${gbm_sha}" \
+            -o "patches/freedesktop-sdk/${f}"
+    done
+
+    python3 - <<'EOF'
+    import hashlib, json, os
+    d = "patches/freedesktop-sdk"
+    files = {f: hashlib.sha256(open(os.path.join(d, f), "rb").read()).hexdigest()
+             for f in sorted(os.listdir(d)) if os.path.isfile(os.path.join(d, f))}
+    manifest = {"comment": "Written by `just patch-sync`; verified offline by `just patch-drift-check`.",
+                "gnome-build-meta-sha": os.environ["gbm_sha"], "files": files}
+    with open("patches/freedesktop-sdk.manifest.json", "w") as fh:
+        json.dump(manifest, fh, indent=2, sort_keys=True)
+        fh.write("\n")
+    print(f"Synced {len(files)} patches and manifest for GBM {os.environ['gbm_sha']}")
+    EOF
+
+# Verify patches/freedesktop-sdk matches its manifest, offline. The only step
+# that contacts upstream is patch-sync, so this never depends on its uptime.
+[group('dev')]
+patch-drift-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    gbm_ref=$(awk '/^[[:space:]]*ref: / { print $2; exit }' elements/gnome-build-meta.bst)
+    [[ "$gbm_ref" =~ -g([0-9a-f]{40})$ ]] || { echo "ERROR: cannot read the gnome-build-meta sha" >&2; exit 1; }
+    export gbm_sha="${BASH_REMATCH[1]}"
+    python3 - <<'EOF'
+    import hashlib, json, os, sys
+    manifest_path = "patches/freedesktop-sdk.manifest.json"
+    if not os.path.exists(manifest_path):
+        sys.exit("ERROR: manifest missing — run `just patch-sync`")
+    m = json.load(open(manifest_path))
+    if m["gnome-build-meta-sha"] != os.environ["gbm_sha"]:
+        sys.exit("ERROR: junction pins GBM %s but patches were synced for %s — run `just patch-sync`"
+                 % (os.environ["gbm_sha"], m["gnome-build-meta-sha"]))
+    d = "patches/freedesktop-sdk"
+    local = {f: hashlib.sha256(open(os.path.join(d, f), "rb").read()).hexdigest()
+             for f in sorted(os.listdir(d)) if os.path.isfile(os.path.join(d, f))}
+    status = 0
+    for f in sorted(set(m["files"]) - set(local)):
+        print(f"ERROR: {f} listed in manifest but missing locally", file=sys.stderr); status = 1
+    for f in sorted(set(local) - set(m["files"])):
+        print(f"ERROR: {f} present locally but not in manifest", file=sys.stderr); status = 1
+    for f in sorted(set(local) & set(m["files"])):
+        if local[f] != m["files"][f]:
+            print(f"ERROR: {f} differs from manifest", file=sys.stderr); status = 1
+    if status:
+        sys.exit("ERROR: patch queue drifted from manifest — run `just patch-sync`")
+    print(f"OK: patches/freedesktop-sdk matches manifest for GBM {os.environ['gbm_sha']} ({len(local)} files)")
+    EOF
+
 # ── Dev ──────────────────────────────────────────────────────────────
 # Check Justfile syntax (and every *.just).
 [group('dev')]

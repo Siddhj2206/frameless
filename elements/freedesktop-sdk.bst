@@ -16,11 +16,18 @@ sources:
   url: gitlab:freedesktop-sdk/freedesktop-sdk.git
   track: freedesktop-sdk-26.08*
   ref: freedesktop-sdk-26.08.1-0-gb02b59ffe19a49a402f357fd5fcb1d552ebc50d7
+# The same patch queue gnome-build-meta applies to freedesktop-sdk, kept in
+# sync by `just patch-sync`. Without it the FSDK elements differ from the ones
+# in the public caches and rebuild from source.
+- kind: patch_queue
+  path: patches/freedesktop-sdk
 
 config:
   options:
     target_arch: '%{arch}'
     (?):
+    - x86_64_v3:
+        x86_64_v3: true
     - arch == 'x86_64':
         bootstrap_build_arch: 'x86_64'
     - arch == 'aarch64':
@@ -54,6 +61,11 @@ config:
     components/pygobject.bst: gnome-build-meta.bst:sdk/pygobject.bst
     components/vala.bst: gnome-build-meta.bst:sdk/vala.bst
     components/libsecret.bst: gnome-build-meta.bst:sdk/libsecret.bst
+    # Kept identical to gnome-build-meta's own list: a missing override makes
+    # the graph diverge from the cache and the affected elements rebuild.
+    components/zenity.bst: gnome-build-meta.bst:void/zenity.bst
+    components/linux-module-cert.bst: gnome-build-meta.bst:gnomeos/linux-module-cert.bst
+    components/libical.bst: gnome-build-meta.bst:core-deps/libical3.bst
     components/_private/systemd-base.bst: gnome-build-meta.bst:core-deps/systemd-base.bst
     components/systemd.bst: gnome-build-meta.bst:core-deps/systemd.bst
     components/systemd-ukify.bst: gnome-build-meta.bst:core-deps/systemd-ukify.bst
