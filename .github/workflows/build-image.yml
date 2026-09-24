@@ -108,8 +108,11 @@ jobs:
 
       # BuildStream's artifact cache. The public read-only caches in project.conf
       # cover the FSDK/GBM graph; this persists what we build on top of it, so a
-      # run that only changes one element does not rebuild the world. The
-      # combined action restores here and saves in a post-step.
+      # run that only changes one element does not rebuild the world.
+      #
+      # save-always is the important part: without it the cache is only written
+      # when the job succeeds, so a failed build (the common case while the
+      # graph is being tuned) caches nothing and the next run starts cold again.
       - name: BuildStream cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
@@ -117,6 +120,7 @@ jobs:
           key: bst-${{ runner.os }}-${{ hashFiles('project.conf', 'elements/freedesktop-sdk.bst', 'elements/gnome-build-meta.bst') }}
           restore-keys: |
             bst-${{ runner.os }}-
+          save-always: true
 
       - name: Capture build timestamp
         id: timestamp
