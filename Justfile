@@ -89,11 +89,12 @@ tags:
 [group('build')]
 build: export
 
-# Check out the built OCI layout, load it into podman, and apply metadata labels.
+# Check out the built OCI layout, load it into podman, and bind the chunkah
+# ownership sidecar to the loaded image. `just chunkify` consumes the sidecar.
 #
 # The graph is assembled by BuildStream; this only moves the result into podman
-# so `bootc`/`generate-bootable-image` and a push can use it. Nothing here edits
-# the image graph.
+# and records who owns which path, so chunkah can chunk by content. Nothing here
+# edits the image graph.
 [group('build')]
 export:
     #!/usr/bin/env bash
@@ -108,8 +109,16 @@ export:
     just bst build oci/image.bst
 
     echo "==> Exporting OCI image → {{ image_name }}:{{ image_tag }}..."
-    rm -rf .build-out
+    rm -rf .build-out .build-ownership-source
     just bst artifact checkout oci/image.bst --directory /src/.build-out
+
+    SIDECAR=.build-out/.frameless/ownership-final.json
+    if [ ! -f "$SIDECAR" ] || [ -L "$SIDECAR" ]; then
+        echo "ERROR: oci/image.bst did not produce a regular ownership sidecar" >&2
+        exit 1
+    fi
+    mkdir -p .build-ownership-source
+    cp --no-dereference "$SIDECAR" .build-ownership-source/ownership-final.json
 
     # `podman pull` (not skopeo) keeps the loaded view intact for a later push.
     IMAGE_ID=$($SUDO_CMD podman pull -q oci:.build-out)
@@ -118,6 +127,7 @@ export:
         echo "ERROR: podman returned an invalid image ID: $IMAGE_ID" >&2
         exit 1
     fi
+    mv .build-ownership-source/ownership-final.json ".build-ownership-source/${IMAGE_ID}.json"
     rm -rf .build-out
 
     # Dynamic provenance labels, applied only when set. The build-time labels
@@ -129,13 +139,181 @@ export:
     if [ "${#LABEL_ARGS[@]}" -gt 0 ]; then
         printf 'FROM %s\n' "$IMAGE_ID" \
             | $SUDO_CMD podman build --pull=never --security-opt label=type:unconfined_t \
-                "${LABEL_ARGS[@]}" -t "{{ image_name }}:{{ image_tag }}" -f - .
+                "${LABEL_ARGS[@]}" --iidfile .build-ownership-source/final-image-id \
+                -t "{{ image_name }}:{{ image_tag }}" -f - .
         $SUDO_CMD podman rmi "$IMAGE_ID" >/dev/null 2>&1 || true
+        FINAL_IMAGE_ID=$(cat .build-ownership-source/final-image-id)
+        FINAL_IMAGE_ID=${FINAL_IMAGE_ID#sha256:}
     else
         $SUDO_CMD podman tag "$IMAGE_ID" "{{ image_name }}:{{ image_tag }}"
+        FINAL_IMAGE_ID="$IMAGE_ID"
+    fi
+    if [[ ! "$FINAL_IMAGE_ID" =~ ^[0-9a-f]{64}$ ]]; then
+        echo "ERROR: podman returned an invalid final image ID: $FINAL_IMAGE_ID" >&2
+        exit 1
     fi
 
-    echo "==> Loaded {{ image_name }}:{{ image_tag }}"
+    # Validate the actual loaded root once and bind its generated TSV to the
+    # immutable final image ID. chunkify refuses a tag-only/stale manifest.
+    OWNERSHIP_DIR=".build-ownership/${FINAL_IMAGE_ID}"
+    rm -rf "$OWNERSHIP_DIR"
+    mkdir -p "$OWNERSHIP_DIR"
+    cp ".build-ownership-source/${IMAGE_ID}.json" "$OWNERSHIP_DIR/ownership-source.json"
+    MOUNT=$($SUDO_CMD podman image mount "$FINAL_IMAGE_ID")
+    cleanup_ownership() { $SUDO_CMD podman image umount "$FINAL_IMAGE_ID" >/dev/null 2>&1 || true; }
+    trap cleanup_ownership EXIT
+    OWNERSHIP_ARCH=$($SUDO_CMD podman image inspect --format '{{ "{{" }}.Architecture{{ "}}" }}' "$FINAL_IMAGE_ID")
+    # The mounted root belongs to the privileged store; hashing root-only files
+    # must use that privilege too.
+    $SUDO_CMD python3 scripts/ownership_metadata.py rebind-exported \
+        --root "$MOUNT" --sidecar "$OWNERSHIP_DIR/ownership-source.json" \
+        --image-id "$FINAL_IMAGE_ID" --arch "$OWNERSHIP_ARCH" \
+        --variant default \
+        --output "$OWNERSHIP_DIR/ownership-final.json" \
+        --manifest "$OWNERSHIP_DIR/fakecap-manifest.tsv"
+    if [ -n "$SUDO_CMD" ]; then
+        $SUDO_CMD chown --reference="$OWNERSHIP_DIR" \
+            "$OWNERSHIP_DIR/ownership-final.json" "$OWNERSHIP_DIR/fakecap-manifest.tsv"
+    fi
+    printf '%s\n' "$FINAL_IMAGE_ID" > "$OWNERSHIP_DIR/image-id"
+    cleanup_ownership
+    trap - EXIT
+    rm -rf .build-ownership-source
+
+    echo "==> Export complete. Image loaded as {{ image_name }}:{{ image_tag }}"
+
+# ── Chunkah ──────────────────────────────────────────────────────────
+# Rechunk the exported image so OTA updates are content-addressed and smaller.
+# Chunkah's rustix xattr backend uses raw syscalls that bypass LD_PRELOAD, so
+# the user.component xattrs must be physically applied to a writable overlay
+# first (fakecap-restore). Run `just export` immediately before this: it binds
+# the ownership manifest to the exact image ID this consumes.
+chunkify image_ref="{{ image_name }}:{{ image_tag }}":
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    if [ "${BUILD_SKIP_CHUNKIFY:-}" = "1" ]; then
+        echo "==> Skipping chunkify (BUILD_SKIP_CHUNKIFY=1)"
+        exit 0
+    fi
+
+    SUDO_CMD=""
+    if [ "$(id -u)" -ne 0 ]; then
+        SUDO_CMD="sudo"
+    fi
+
+    echo "==> Chunkifying {{ image_ref }}..."
+
+    IMAGE_ID=$($SUDO_CMD podman image inspect --format '{{ "{{" }}.Id{{ "}}" }}' "{{ image_ref }}")
+    IMAGE_ID=${IMAGE_ID#sha256:}
+    if [[ ! "$IMAGE_ID" =~ ^[0-9a-f]{64}$ ]]; then
+        echo "ERROR: invalid image ID: $IMAGE_ID" >&2
+        exit 1
+    fi
+    CONFIG=$($SUDO_CMD podman inspect "$IMAGE_ID")
+    EXPORT_MANIFEST=".build-ownership/${IMAGE_ID}/fakecap-manifest.tsv"
+    if [ ! -f "$EXPORT_MANIFEST" ] || [ -L "$EXPORT_MANIFEST" ] || [ "$(cat ".build-ownership/${IMAGE_ID}/image-id" 2>/dev/null || true)" != "$IMAGE_ID" ]; then
+        echo "ERROR: no validated ownership manifest bound to immutable image ID $IMAGE_ID" >&2
+        exit 1
+    fi
+
+    # Compile fakecap-restore from source if not already built.
+    FAKECAP_RESTORE="{{ justfile_directory() }}/files/fakecap/fakecap-restore"
+    if [ ! -x "$FAKECAP_RESTORE" ]; then
+        echo "==> Compiling fakecap-restore..."
+        gcc -O2 -o "$FAKECAP_RESTORE" "{{ justfile_directory() }}/files/fakecap/fakecap-restore.c"
+    fi
+
+    LOWER=""; UPPER=""; WORK=""; MERGED=""; MANIFEST_DIR=""; OUTPUT_DIR=""
+    cleanup() {
+        status=$?
+        trap - EXIT
+        set +e
+        mounted=false
+        if [ -n "$MERGED" ] && $SUDO_CMD mountpoint -q "$MERGED"; then
+            if ! $SUDO_CMD umount "$MERGED"; then
+                echo "ERROR: overlay still mounted at $MERGED; preserving overlay and lower mount" >&2
+                mounted=true
+                [ "$status" -ne 0 ] || status=1
+            fi
+        fi
+        if [ "$mounted" = false ]; then
+            for directory in "$UPPER" "$WORK" "$MERGED"; do
+                if [ -n "$directory" ]; then
+                    $SUDO_CMD rm -rf -- "$directory" || { [ "$status" -ne 0 ] || status=1; }
+                fi
+            done
+            if [ -n "$LOWER" ]; then
+                $SUDO_CMD podman image umount "$IMAGE_ID" >/dev/null || { [ "$status" -ne 0 ] || status=1; }
+            fi
+        fi
+        for directory in "$MANIFEST_DIR" "$OUTPUT_DIR"; do
+            if [ -n "$directory" ]; then
+                $SUDO_CMD rm -rf -- "$directory" || { [ "$status" -ne 0 ] || status=1; }
+            fi
+        done
+        exit "$status"
+    }
+    trap cleanup EXIT
+
+    # Check the TSV bytes against the final-image sidecar, then consume a private
+    # copy so a concurrent export cannot change them after validation.
+    MANIFEST_DIR=$(mktemp -d)
+    MANIFEST="$MANIFEST_DIR/manifest.tsv"
+    $SUDO_CMD python3 scripts/ownership_metadata.py prepare-chunkify \
+        --sidecar ".build-ownership/${IMAGE_ID}/ownership-final.json" \
+        --image-id "$IMAGE_ID" --manifest "$EXPORT_MANIFEST" --output "$MANIFEST"
+
+    # Chunkah's raw xattr syscalls require a physical writable overlay.
+    LOWER=$($SUDO_CMD podman image mount "$IMAGE_ID")
+
+    # Disk-backed scratch with room for overlay copy-ups and the uncompressed
+    # OCI directory. Not /tmp: runner tmpfs can be smaller than one image.
+    _OVERLAY_TMPDIR="/var/tmp"
+    for _candidate in /var/lib/containers /var/tmp; do
+        if [ -d "$_candidate" ]; then
+            _free=$(df --output=avail "$_candidate" 2>/dev/null | tail -1 || echo 0)
+            _best=$(df --output=avail "$_OVERLAY_TMPDIR" 2>/dev/null | tail -1 || echo 0)
+            if (( _free > _best )); then _OVERLAY_TMPDIR="$_candidate"; fi
+        fi
+    done
+    echo "==> overlay tmpdir: ${_OVERLAY_TMPDIR} ($(df -h --output=avail "${_OVERLAY_TMPDIR}" | tail -1 | tr -d ' ') free)"
+    UPPER=$(mktemp -d -p "$_OVERLAY_TMPDIR"); WORK=$(mktemp -d -p "$_OVERLAY_TMPDIR"); MERGED=$(mktemp -d -p "$_OVERLAY_TMPDIR")
+    OUTPUT_DIR=$(mktemp -d -p "$_OVERLAY_TMPDIR")
+    $SUDO_CMD chmod 755 "$UPPER" "$WORK" "$MERGED"
+    $SUDO_CMD mount -t overlay overlay \
+        -o "lowerdir=${LOWER},upperdir=${UPPER},workdir=${WORK}" \
+        "$MERGED"
+
+    echo "==> Applying user.component xattrs via fakecap-restore..."
+    $SUDO_CMD "$FAKECAP_RESTORE" "$MANIFEST" "$MERGED"
+
+    # CHUNKAH_CONFIG_STR preserves the OCI labels (containers.bootc=1).
+    CHUNKAH_REF="quay.io/coreos/chunkah:v0.6.0@sha256:ff8b8b466a942ec6000445d4001fc661e2fc5a952ad9ee29b4de9ab09d1d1708"
+    for attempt in 1 2 3; do
+        $SUDO_CMD podman pull "$CHUNKAH_REF" && break
+        echo "==> chunkah pull attempt $attempt failed, retrying in 10s..."
+        [ "$attempt" -lt 3 ] && sleep 10
+    done
+    $SUDO_CMD podman run --rm \
+        --pull never \
+        --security-opt label=type:unconfined_t \
+        -v "${MERGED}:/chunkah:ro" \
+        -v "${OUTPUT_DIR}:/chunkah-output:rw" \
+        -e "CHUNKAH_ROOTFS=/chunkah" \
+        -e "CHUNKAH_CONFIG_STR=$CONFIG" \
+        "$CHUNKAH_REF" build --max-layers 120 --prune /sysroot/ \
+        --label ostree.commit- --label ostree.final-diffid- \
+        --output oci:/chunkah-output/image
+
+    NEW_ID=$($SUDO_CMD podman pull --quiet "oci:${OUTPUT_DIR}/image")
+    NEW_ID=${NEW_ID#sha256:}
+    if [[ ! "$NEW_ID" =~ ^[0-9a-f]{64}$ ]]; then
+        echo "ERROR: invalid imported chunkah image ID: $NEW_ID" >&2
+        exit 1
+    fi
+    echo "==> Retagging chunked image to {{ image_ref }}..."
+    $SUDO_CMD podman tag "$NEW_ID" "{{ image_ref }}"
 
 # ── Run ──────────────────────────────────────────────────────────────
 # Run bootc against the loaded image, e.g.
@@ -421,4 +599,4 @@ format:
 clean:
     #!/usr/bin/bash
     set -euo pipefail
-    rm -rf .build-out output bootable.raw bootable.qcow2 .ovmf-vars.fd
+    rm -rf .build-out .build-ownership .build-ownership-source output bootable.raw bootable.qcow2 .ovmf-vars.fd

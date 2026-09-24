@@ -1,15 +1,17 @@
 ###############################################################################
 # OCI image assembly
 ###############################################################################
-# The default target. Stages the filtered root at /layer, runs the
-# post-install steps that make the filesystem bootable, then hands it to
-# freedesktop-sdk's build-oci to emit an OCI layout with the bootc label.
+# The default target. Stages the filtered root at /layer, runs the post-install
+# steps that make the filesystem bootable, then hands it to freedesktop-sdk's
+# build-oci to emit an OCI layout with the bootc label.
+#
+# It also finalizes the chunkah ownership metadata (elements/oci/chunkah/) into
+# the image, so `just chunkify` can turn the image into content-chunked layers.
 #
 # Build it with:  just bst build oci/image.bst
 # Checkout:       just bst artifact checkout oci/image.bst --directory out
 #
-# The label values come from project.conf's identity variables; the os-release
-# element is #18's.
+# The label values come from project.conf's identity variables.
 ###############################################################################
 kind: script
 
@@ -23,6 +25,12 @@ build-depends:
   - filename: oci/layers/image.bst
     config:
       location: /layer
+  - filename: oci/chunkah/frameless.bst
+    config:
+      location: /ownership
+  - filename: oci/chunkah-metadata-tool.bst
+    config:
+      location: /ownership-tool
 
 environment:
   LD_PRELOAD: /usr/libexec/fakecap/fakecap.so
@@ -33,10 +41,18 @@ variables:
     - include/fsdk-version.yml
   # Seeds /etc/machine-id deterministically; bootc regenerates it on deploy.
   sysroot-seed: b57666f6-0fe5-4310-adff-f256936d164d
+  # The ownership variant name carried into the metadata.
+  ownership-variant: default
 
 config:
   commands:
     - mkdir /fakecap
+
+    # The ownership basis describes the exact compose layer; verify it before
+    # anything mutates the root.
+    - |
+      python3 /ownership-tool/ownership-tool/ownership_metadata.py verify-basis \
+        --root /layer --basis /ownership/ownership/basis.json
 
     # Apply the collected initial scripts (sysusers, tmpfiles, units).
     - |
@@ -91,3 +107,14 @@ config:
         index-annotations:
           'org.opencontainers.image.ref.name': 'ghcr.io/%{image-vendor}/%{project-name}:latest'
       EOF
+
+    # build-oci normalizes generated metadata. Bind ownership to the completed
+    # archive, not its pre-packaging source tree.
+    - |
+      python3 /ownership-tool/ownership-tool/ownership_metadata.py finalize-oci \
+        --layout "%{install-root}" --root /layer \
+        --basis /ownership/ownership/basis.json \
+        --arch "%{go-arch}" --variant "%{ownership-variant}" \
+        --output /ownership/final.json
+      mkdir -p "%{install-root}/.frameless"
+      cp /ownership/final.json "%{install-root}/.frameless/ownership-final.json"

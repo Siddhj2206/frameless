@@ -39,11 +39,6 @@ env:
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
   DEFAULT_TAG: "stable"
   PRODUCTION_BRANCH: "stable" # The branch that publishes :stable production images
-  # Rechunking is available through the shared OCI-native chunka action and is
-  # off by default. The build-time chunkah-ownership pipeline is a separate
-  # decision — see docs/research/07-dakota-alpha-6.md.
-  ENABLE_RECHUNKING: "false"
-  RECHUNK_MAX_LAYERS: "128"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
@@ -123,24 +118,26 @@ jobs:
           restore-keys: |
             bst-${{ runner.os }}-
 
+      - name: Capture build timestamp
+        id: timestamp
+        run: echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
       - name: Build image with BuildStream
         id: build-image
         env:
-          IMAGE_NAME: ${{ env.IMAGE_NAME }}
-          DEFAULT_TAG: ${{ env.DEFAULT_TAG }}
+          BUILD_IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          BUILD_IMAGE_TAG: ${{ env.DEFAULT_TAG }}
+          OCI_IMAGE_CREATED: ${{ steps.timestamp.outputs.created }}
+          OCI_IMAGE_REVISION: ${{ github.sha }}
         run: |
           set -euo pipefail
-          # `just bst` runs bst in the pinned bst2 container and regenerates
-          # include/fsdk-version.yml from the FSDK junction ref.
-          just bst build oci/image.bst
-
-          # Export the OCI layout and load it into podman so the tag/push/sign
-          # reusables below operate on a normal local image. `podman pull` (not
-          # skopeo) keeps the loaded view intact for the push.
-          rm -rf out
-          just bst artifact checkout oci/image.bst --directory /src/out
-          IMAGE_ID=$(sudo podman pull -q oci:out)
-          sudo podman tag "${IMAGE_ID}" "localhost/${IMAGE_NAME}:${DEFAULT_TAG}"
+          # `just export` builds oci/image.bst, loads the OCI layout into podman,
+          # and binds the chunkah ownership sidecar to the loaded image. It
+          # regenerates include/fsdk-version.yml from the FSDK junction ref.
+          just export
+          # Rechunk so OTA updates are content-addressed and smaller. This
+          # consumes the ownership sidecar export just bound.
+          just chunkify "${IMAGE_NAME}:${DEFAULT_TAG}"
 
       - name: Get version label
         id: version
@@ -200,31 +197,10 @@ jobs:
           echo "tags=${branch_tags[*]}" >> "${GITHUB_OUTPUT}"
           echo "default-tag=${DEFAULT_TAG}" >> "${GITHUB_OUTPUT}"
 
-      # OPTIONAL: set ENABLE_RECHUNKING to "true" above for smaller OTA deltas.
-      # This is the shared OCI-native chunka action, which runs on the local
-      # image; the build-time chunkah-ownership pipeline alpha 6 uses is a
-      # separate decision (docs/research/07-dakota-alpha-6.md).
-      - name: Rechunk image
-        if: env.ENABLE_RECHUNKING == 'true'
-        id: rechunk-image
-        uses: projectbluefin/actions/bootc-build/chunka@9e1acbe66ec87cd07b573e1671a3ecaee7df73d0 # v1
-        with:
-          source-image: localhost/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}
-          max-layers: ${{ env.RECHUNK_MAX_LAYERS }}
-
-      - name: Tag images
-        shell: bash
-        env:
-          ALIAS_TAGS: ${{ steps.branch-tags.outputs.tags }}
-        run: |
-          sudo -E "$(command -v just)" tag-images "${IMAGE_NAME}" \
-                          "${DEFAULT_TAG}" \
-                          "${ALIAS_TAGS}"
-
       # Every build here is a candidate build from main and publishes tags.
       # execute-release.yml promotes the signed, gated candidate digest to
       # :stable without a stable-branch rebuild, so the upstream push-image
-      # action owns all registry authentication and pushing.
+      # action owns all registry authentication, tagging, and pushing.
 
       - name: Push to GHCR
         id: push
