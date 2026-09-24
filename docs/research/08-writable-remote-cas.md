@@ -6,6 +6,12 @@ It extends `docs/research/06-ci-caching-personal-account.md`, which established
 that the public caches are read-only and that a personal account has no
 `projectbluefin` CAS credentials.
 
+**Constraint: everything stays on GitHub.** No VPS, no homelab, no
+self-hosted service. That reframes the question from "which REAPI server" to
+"can GitHub itself hold the cache" — see *GitHub-native alternatives* below. The
+server survey is kept because it explains why a real remote CAS cannot live on
+GitHub, and what to do if the constraint is ever lifted.
+
 ## The requirement, precisely
 
 BuildStream's cache-server docs are explicit about what a server must implement:
@@ -104,58 +110,54 @@ writable cache is a cache-poisoning target. mTLS is the portable choice here —
 NativeLink and Buildbarn both support it, and BuildStream has first-class fields
 for it.
 
-## Hosting and cost
+## GitHub-native alternatives (no server)
 
-The service must be reachable from GitHub runners over TLS, and it holds real
-disk (heuristic: 5–20 GB per active developer; a partial GNOME CAS is larger).
+The project keeps everything on GitHub, so a self-hosted REAPI server is out.
+What GitHub itself offers:
 
-| Option | Notes | Cost |
-| --- | --- | --- |
-| Small VPS (Hetzner CX22 class) | 40 GB disk, filesystem backend, Caddy/nginx + Let's Encrypt for TLS | ~€4/mo |
-| Oracle Cloud always-free | 4 ARM cores, 24 GB RAM, 200 GB block storage | €0 |
-| Homelab | Any always-on Linux box; expose via a tunnel or a domain | €0 + electricity |
-| Object storage backend (Cloudflare R2) | NativeLink/Buildbarn store blobs in R2; 10 GB free tier | €0–few |
+| Store | Shape | Limit | Cost beyond the free tier |
+| --- | --- | --- | --- |
+| **Actions cache** | a *directory* cache (`~/.cache/buildstream`), not a CAS protocol | 10 GB per repo free; **user-owned repos can raise it to 10 TB** | **$0.07/GB/month** (50 GB ≈ $2.80, 200 GB ≈ $13.30) |
+| GHCR / GitHub Packages | an OCI artifact holding the cache tarball | shares the artifact allowance (500 MB free on Free, 1 GB Pro) | **$0.25/GB/month** — worse for bulk data |
+| Releases / artifacts | a tarball per release | 2 GB per asset; artifacts expire | — |
 
-The storage backend choice matters more than the host: filesystem is fine below
-~100 GB; S3-compatible (R2/B2) scales and survives the host.
+**There is no GitHub-hosted REAPI/CAS service.** GitHub cannot host the
+protocol-level cache BuildStream speaks, so the GitHub-native equivalent is
+*"a bigger `actions/cache`"*, not a real remote CAS.
 
-## The ROI caveat (read this before building it)
+Raising the Actions cache limit is a repository setting that needs a payment
+method on file and an opt-in in the Actions settings; cache storage is billed
+separately from artifacts and packages, and only above the included 10 GB.
+Sources: GitHub dependency-caching reference
+(<https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching>)
+and Actions billing
+(<https://docs.github.com/en/billing/concepts/product-billing/github-actions>).
 
-A writable CAS pays for **builds we would otherwise do from source**. With the
-junction parity fixed (`docs/research/07-dakota-alpha-6.md` and the first-build
-lesson), the expensive part of the graph — the freedesktop-sdk and
-gnome-build-meta base, including the GNOME SDK — is **pulled from the public
-caches**, not built. frameless's *own* elements are small: the runtime sources,
-the os-release generator, the chunkah ownership element, and the OCI assembly.
+### The catch that makes it cheaper than it looks
 
-So the writable CAS would save little on a routine build, and a lot only when:
+The local `~/.cache/buildstream` is large mostly because it also holds every
+artifact **pulled** from the public caches — the GNOME SDK and the whole
+freedesktop-sdk/gnome-build-meta graph. Those are re-pullable and need not be
+cached at all. BuildStream offers no way to cache only the artifacts *we* built;
+`cache.storage-service` moves content to a remote storage service, which is the
+thing we cannot host.
 
-- a junction bump lands before upstream has published that graph to the public
-  caches (the element then builds from source for every run until upstream
-  catches up);
-- the public caches lack an element for our option set (exactly what the SDK
-  rebuild was);
-- we deliberately build something expensive ourselves (a custom kernel, an
-  element we patch).
-
-That is the honest ordering: **parity first, `save-always` second, a writable
-CAS third** — and only if the first two still leave builds long enough to
-matter.
+So the honest sizing question is: how big is the cache once the public-cache
+content is excluded? frameless's own elements are small. If that is a few GB, the
+free 10 GB cache holds it and **nothing needs to change but `save-always`**.
 
 ## Recommendation
 
-1. **Do not build it yet.** Fix the two cheap things first (junction parity;
-   `actions/cache` with `save-always`), and measure. If a routine build is still
-   hours after both, revisit.
-2. **If it is needed**, stand up **NativeLink** (simplest, single binary,
-   BuildStream integration test) on a free-tier VM or a homelab, with mTLS and a
-   filesystem or R2 backend. Buildbarn's `bb-storage` + `bb-remote-asset` is the
-   fallback if NativeLink disappoints.
-3. **Wire it as a CI user config**, not in `project.conf`: `project.conf` stays
-   pull-only and public, and CI writes a `buildstream-ci.conf` with the
-   authenticated writable `artifacts.servers`/`source-caches.servers` plus
-   `push: true`. The client cert/key go in repository secrets. This mirrors how
-   dakota keeps its writable cache out of `project.conf`.
+1. **Do nothing new until it is measured.** Junction parity
+   (`docs/research/07-dakota-alpha-6.md`) plus `actions/cache` with `save-always`
+   is the whole fix if the cache fits 10 GB.
+2. **If it does not fit**, raise the repository's Actions cache limit — a
+   payment method plus the Actions settings opt-in — and accept $0.07/GB/month
+   above 10 GB. That is the only fully GitHub-native writable cache.
+3. **Only if a directory cache proves too slow** (tarring and uploading a
+   multi-GB cache every run) does a self-hosted REAPI server (NativeLink,
+   Buildbarn) become worth revisiting — and that is explicitly out of scope for a
+   GitHub-only project.
 
 ## Sources
 
