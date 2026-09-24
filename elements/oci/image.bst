@@ -13,6 +13,9 @@
 ###############################################################################
 kind: script
 
+(@):
+  - include/fsdk-version.yml
+
 build-depends:
   - gnome-build-meta.bst:freedesktop-sdk.bst:components/fakecap.bst
   - gnome-build-meta.bst:freedesktop-sdk.bst:components/oci-builder.bst
@@ -82,6 +85,7 @@ config:
             'org.opencontainers.image.title': '%{project-name}'
             'org.opencontainers.image.description': '%{image-description}'
             'org.opencontainers.image.vendor': '%{image-vendor}'
+            'org.opencontainers.image.version': '%{fsdk-version}'
             'org.opencontainers.image.licenses': 'Apache-2.0'
             'org.opencontainers.image.source': 'https://github.com/Siddhj2206/frameless'
             'containers.bootc': '1'

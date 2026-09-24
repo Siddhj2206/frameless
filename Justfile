@@ -7,6 +7,15 @@ export qemu_image := env("QEMU_IMAGE", "ghcr.io/qemus/qemu:7.50@sha256:e7f6fda52
 export vm_ram := env("VM_RAM", "8192")
 export vm_cpus := env("VM_CPUS", "4")
 
+# The FSDK release, parsed from the pinned junction ref in
+# elements/freedesktop-sdk.bst — the single source of truth for the image
+# version. e.g. "26.08.1". Bumping the junction moves the version with it; the
+# `just bst` recipe writes it into include/fsdk-version.yml for elements to read
+# as %{fsdk-version}.
+export fsdk_version := `grep -E '^\s*ref:' elements/freedesktop-sdk.bst | head -1 | sed -E 's/.*freedesktop-sdk-//; s/-[0-9]+-g[0-9a-f]+$//'`
+# The exact junction ref, for provenance and release notes.
+export fsdk_ref := `grep -E '^\s*ref:' elements/freedesktop-sdk.bst | head -1 | sed -E 's/^\s*ref:\s*//'`
+
 # BuildStream container image used by local runs and CI. Pinned to a digest for
 # reproducibility; override with BST2_IMAGE. This digest is the freedesktop-sdk
 # bst2 image carrying BuildStream 2.8, matching project.conf's min-version; the
@@ -52,6 +61,10 @@ check:
 bst *ARGS:
     #!/usr/bin/env bash
     set -euo pipefail
+    # Regenerate include/fsdk-version.yml from the pinned FSDK junction ref, so
+    # elements consume %{fsdk-version} without re-parsing the ref. Gitignored;
+    # never hand-edited. Every bst entry point goes through here, including CI.
+    printf 'fsdk-version: "%s"\n' "{{ fsdk_version }}" > include/fsdk-version.yml
     if [ -n "${BST_RUNNER:-}" ]; then
         exec "$BST_RUNNER" {{ ARGS }}
     fi
@@ -68,6 +81,19 @@ bst *ARGS:
         -w /src \
         "{{ bst2_image }}" \
         bash -c 'bst --colors "$@"' -- --no-interactive ${BST_FLAGS:-} {{ ARGS }}
+
+# The OCI tags to publish for this build, one per line: the minor stream and the
+# exact FSDK release. CI appends the branch tags (:stable-testing, :stable).
+[group('BuildStream')]
+tags:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    v="{{ fsdk_version }}"
+    minor="$(grep -oE '^[0-9]+\.[0-9]+' <<<"${v}")"
+    printf '%s\n' "${minor}"
+    if [[ "${v}" != "${minor}" ]]; then
+        printf '%s\n' "${v}"
+    fi
 
 # Run the contract suite: interfaces the image must satisfy. A fork keeps these.
 [group('Just')]

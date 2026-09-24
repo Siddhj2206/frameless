@@ -11,4 +11,5 @@
 kind: manual
 
 (@):
+  - include/fsdk-version.yml
   - include/os-release.yml
