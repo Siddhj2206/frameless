@@ -13,9 +13,6 @@
 ###############################################################################
 kind: script
 
-(@):
-  - include/fsdk-version.yml
-
 build-depends:
   - gnome-build-meta.bst:freedesktop-sdk.bst:components/fakecap.bst
   - gnome-build-meta.bst:freedesktop-sdk.bst:components/oci-builder.bst
@@ -32,6 +29,8 @@ environment:
   FAKECAP_DB: /fakecap
 
 variables:
+  (@):
+    - include/fsdk-version.yml
   # Seeds /etc/machine-id deterministically; bootc regenerates it on deploy.
   sysroot-seed: b57666f6-0fe5-4310-adff-f256936d164d
 

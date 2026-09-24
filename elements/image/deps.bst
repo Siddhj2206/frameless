@@ -1,22 +1,24 @@
 ###############################################################################
 # Image package manifest
 ###############################################################################
-# The default image's dependency list. `kind: stack` groups elements without
-# producing content; add or remove image content here, never by editing a
-# build script.
+# The default image's dependency list, and the map of the image. `kind: stack`
+# groups elements without producing content; add or remove image content here,
+# never by editing a build script.
 #
-# The base is gnome-build-meta's GNOME OS deps. The ublue runtime layer
-# (common, brew, firstboot) and the `custom/` seam sit on top.
+# Read it top to bottom:
+#   desktop/   the desktop — swap this element for KDE, niri, or nothing
+#   ublue/     the bundled ublue runtime (ujust, Homebrew, first-boot)
+#   custom/    your own declarations, from the custom/ directory
 ###############################################################################
 kind: stack
 
 depends:
-  - gnome-build-meta.bst:gnomeos-deps/deps.bst
-
-  # ujust needs `just` at runtime; common only needs it to build completions.
+  # ── desktop ────────────────────────────────────────────────────────────
+  - desktop/gnome.bst
+  # ujust needs `just` at runtime; the ublue elements only build with it.
   - gnome-build-meta.bst:gnomeos-deps/just.bst
 
-  # ── ublue runtime layer ────────────────────────────────────────────────
+  # ── ublue runtime ──────────────────────────────────────────────────────
   - ublue/common.bst
   - ublue/brew.bst
   - ublue/brew-tarball.bst

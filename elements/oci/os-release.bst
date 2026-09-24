@@ -10,6 +10,9 @@
 ###############################################################################
 kind: manual
 
+variables:
+  (@):
+    - include/fsdk-version.yml
+
 (@):
-  - include/fsdk-version.yml
   - include/os-release.yml

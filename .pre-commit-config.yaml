@@ -10,7 +10,7 @@ repos:
       - id: end-of-file-fixer
       - id: trailing-whitespace
 
-  # Brewfile validation has exactly one implementation: build/validate-brewfiles.sh.
+  # Brewfile validation has exactly one implementation: scripts/validate-brewfiles.sh.
   # This hook must stay a caller of that script and must never hand a repository
   # Brewfile to `brew bundle` / `brew bundle check` -- Brewfiles are a Ruby DSL,
   # so evaluating a PR-controlled one is code execution in CI.
@@ -19,7 +19,7 @@ repos:
     hooks:
       - id: validate-brewfiles
         name: Validate Brewfiles
-        entry: bash -c 'if command -v brew &> /dev/null; then bash build/validate-brewfiles.sh custom/brew; else echo "⚠️  Homebrew not installed, skipping Brewfile validation"; fi'
+        entry: bash -c 'if command -v brew &> /dev/null; then bash scripts/validate-brewfiles.sh custom/brew; else echo "⚠️  Homebrew not installed, skipping Brewfile validation"; fi'
         language: system
         files: '^custom/brew/.*\.Brewfile.*$'
         pass_filenames: false

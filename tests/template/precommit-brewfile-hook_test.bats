@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # Contract gate for .pre-commit-config.yaml (see #323).
 #
-# build/validate-brewfiles.sh is the single implementation of Brewfile
+# scripts/validate-brewfiles.sh is the single implementation of Brewfile
 # validation. It exists because Brewfiles are a Ruby DSL: handing a
 # PR-controlled Brewfile to `brew bundle` / `brew bundle check` executes it.
 # `pre-commit run --all-files` runs in CI (pr-validation.yml ->
@@ -14,7 +14,7 @@
 # Run with: bats tests/template/precommit-brewfile-hook_test.bats
 
 CONFIG="${BATS_TEST_DIRNAME}/../../.pre-commit-config.yaml"
-SCRIPT="${BATS_TEST_DIRNAME}/../../build/validate-brewfiles.sh"
+SCRIPT="${BATS_TEST_DIRNAME}/../../scripts/validate-brewfiles.sh"
 
 # The `entry:` line of the local validate-brewfiles hook.
 hook_entry() {
@@ -32,10 +32,10 @@ hook_entry() {
     [ -n "$output" ]
 }
 
-@test "validate-brewfiles hook delegates to build/validate-brewfiles.sh" {
+@test "validate-brewfiles hook delegates to scripts/validate-brewfiles.sh" {
     run hook_entry
     [ "$status" -eq 0 ]
-    [[ "$output" == *"build/validate-brewfiles.sh"* ]]
+    [[ "$output" == *"scripts/validate-brewfiles.sh"* ]]
 }
 
 @test "the delegated script is present" {
@@ -43,20 +43,20 @@ hook_entry() {
 }
 
 @test "the hook invokes the script the same way the Justfile does" {
-    # Justfile:validate-brewfiles runs `bash build/validate-brewfiles.sh`.
+    # Justfile:validate-brewfiles runs `bash scripts/validate-brewfiles.sh`.
     # The script is not committed with the executable bit, so the hook must
     # invoke it through bash too or pre-commit fails with EACCES.
     run hook_entry
     [ "$status" -eq 0 ]
-    [[ "$output" == *"bash build/validate-brewfiles.sh"* ]]
-    run grep -c 'bash build/validate-brewfiles.sh' "${BATS_TEST_DIRNAME}/../../Justfile"
+    [[ "$output" == *"bash scripts/validate-brewfiles.sh"* ]]
+    run grep -c 'bash scripts/validate-brewfiles.sh' "${BATS_TEST_DIRNAME}/../../Justfile"
     [ "$status" -eq 0 ]
 }
 
 @test "no pre-commit hook feeds a repository Brewfile to brew bundle" {
     # Any `brew bundle` (with or without `check`) in the config is a
     # re-implementation: the sole legitimate `brew bundle` call lives inside
-    # build/validate-brewfiles.sh and runs on a generated literal-taps file,
+    # scripts/validate-brewfiles.sh and runs on a generated literal-taps file,
     # never on a file from custom/brew/.
     # Strip full-line comments first so the rationale comment above the hook
     # does not trip its own gate.
