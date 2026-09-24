@@ -16,6 +16,16 @@ sources:
   url: gnome:gnome-build-meta.git
   track: gnome-51
   ref: 51.0-3-ge34f1eb8c12742aedb1ee65b855c5d88741d9f92
+# The kernel build-depends (strict) on gnome-build-meta's boot-key certificate,
+# and gnome-build-meta's CI generates files/boot-keys/modules/linux-module-cert.crt
+# before building (make -C files/boot-keys generate-keys IMPORT_MODE=snakeoil).
+# The file is gitignored, so a clean checkout lacks it, the cert element's
+# source digest differs, and the kernel gets a cache key the public caches do
+# not hold — so it rebuilds from source instead of being pulled. This patch
+# recreates exactly what CI generates, from the two snakeoil certificates it
+# concatenates.
+- kind: patch_queue
+  path: patches/gnome-build-meta
 
 config:
   options:
