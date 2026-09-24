@@ -62,6 +62,12 @@ Two caches, easily conflated:
   cache, saved and restored between our own runs. It speeds up the second run,
   not the first.
 
+Measured on frameless: a cold build is ~2.5 h; with the Actions cache restored,
+the same graph re-runs in ~30 min and rebuilds only the elements whose inputs
+changed (12 of 1098). A project-variable change reaches only the elements that
+reference it, not the whole graph. The `Pipeline Summary` at the end of a build
+reports `Total` and `Build Queue processed` — that is the number to watch.
+
 The top element is always ours: `oci/image.bst` embeds our identity, so its key
 is unique and it always builds. It is a compose plus a metadata step, seconds of
 work; the expensive layers are the ones upstream hands us.

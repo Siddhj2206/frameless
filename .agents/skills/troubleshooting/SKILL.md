@@ -44,7 +44,7 @@ cheapest diagnostics. `just bst artifact delete <element>` drops a bad artifact.
 |---|---|---|
 | `validate` never runs | branch protection names a check no workflow produces | the context must be exactly `validate` |
 | `validate-bst` fails | the graph does not load | run `just bst show oci/image.bst --deps none` locally |
-| the build is slow and never seems to cache | there is no writable remote CAS, and GitHub's cache cap is 10 GB | expected on a personal account; see `docs/research/06-ci-caching-personal-account.md` |
+| a re-run rebuilds the whole graph instead of reusing artifacts | the Actions cache did not restore — a cold first run, or the 10 GB cap evicted it | check that the `BuildStream cache` step hit; the cap is the standing limit (`docs/research/08-writable-remote-cas.md`). A restored cache re-runs the same graph in ~30 min, rebuilding only the elements whose inputs changed |
 | Renovate opens nothing | `RENOVATE_TOKEN` is missing or lacks the `workflow` scope | recreate the token |
 | the promotion PR never opens | `stable` does not exist | create the branch |
 | the promotion PR will not merge | `stable` requires an approval | set required approvals to 0 |
