@@ -148,16 +148,40 @@ free 10 GB cache holds it and **nothing needs to change but `save-always`**.
 
 ## Recommendation
 
-1. **Do nothing new until it is measured.** Junction parity
-   (`docs/research/07-dakota-alpha-6.md`) plus `actions/cache` with `save-always`
-   is the whole fix if the cache fits 10 GB.
-2. **If it does not fit**, raise the repository's Actions cache limit — a
-   payment method plus the Actions settings opt-in — and accept $0.07/GB/month
-   above 10 GB. That is the only fully GitHub-native writable cache.
-3. **Only if a directory cache proves too slow** (tarring and uploading a
-   multi-GB cache every run) does a self-hosted REAPI server (NativeLink,
-   Buildbarn) become worth revisiting — and that is explicitly out of scope for a
-   GitHub-only project.
+**Decision: stay on the Actions cache.** No self-hosted REAPI server.
+
+1. `actions/cache` on `~/.cache/buildstream` with `save-always: true` is the
+   writable cache. It is a directory cache, not a protocol cache — BuildStream
+   sees a warm local CAS and does the rest.
+2. If the cache outgrows the free 10 GB, raise the repository's Actions cache
+   limit (a payment method plus the Actions settings opt-in; up to 10 TB, billed
+   at $0.07/GB/month above 10 GB).
+3. Design against the **6-hour per-job cap** — see below. That is the number that
+   matters, not minutes.
+4. The self-hosted server survey above stays only as the record of why a real
+   remote CAS cannot live on GitHub, and what to do if the constraint is ever
+   lifted.
+
+## The hard limits that still apply
+
+Minutes are free and unmetered on public repositories that use standard
+GitHub-hosted runners, so a public repo is not billed for build time. "No
+runtime limit" is still false — these are hard caps:
+
+| Limit | Value | Increasable |
+| --- | --- | --- |
+| **Job execution time** (GitHub-hosted) | **6 hours** | no |
+| Workflow run time (incl. waiting) | 35 days | no |
+| Concurrent jobs (standard runner, Free plan) | 20 | support ticket |
+| Runner disk | ~14 GB free | no |
+| Actions cache storage | 10 GB free; up to 10 TB configurable for user-owned repos | by configuration, billed above 10 GB |
+| Cache uploads / downloads | 200 / 1500 per minute | no |
+
+The 6-hour job cap is the one to design against: a cold full build that rebuilds
+the GNOME SDK approaches it, which is why junction parity and the warm cache are
+not optional. `build-image.yml` sets `timeout-minutes: 360` to match the cap.
+Sources: <https://docs.github.com/en/actions/reference/limits> and
+<https://docs.github.com/en/billing/concepts/product-billing/github-actions>.
 
 ## Sources
 
