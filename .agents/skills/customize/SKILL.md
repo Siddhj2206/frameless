@@ -1,9 +1,9 @@
 ---
 name: customize
 description: >-
-  Decide where a package, app, or command belongs — dnf5 at build time,
-  Homebrew, Flatpak, or ujust — and how each is validated. Use when adding
-  or removing something from the image.
+  Decide where a package, app, or command belongs — a BuildStream element, a
+  Brewfile, a Flatpak preinstall, or a ujust recipe — and how each is validated.
+  Use when adding or removing something from the image.
 ---
 
 # Customize
@@ -12,31 +12,35 @@ description: >-
 
 | The thing is… | Put it in | Installed |
 |---|---|---|
-| A system package the image needs to boot or run | `build/20-packages-and-services.sh` | at build time |
+| A system package the image needs to boot or run | an element in `elements/image/deps.bst` | at build time |
 | A CLI tool a user chooses to have | `custom/brew/*.Brewfile` | on demand, by the user |
 | A GUI application | `custom/flatpaks/*.preinstall` | on first boot |
-| A command that configures the system | `custom/ujust/*.just` | available from first login |
+| A command that configures the system | `custom/ujust/*.just` | from first login |
 | A system file: unit, preset, tmpfiles.d | `custom/files/` | at build time |
 | Per-user config for new accounts | `custom/config/` | at build time, into `/etc/skel` |
 
 The dividing line is who decides and when: build time for what the image must
-have, runtime for what the user chooses.
+have, runtime for what the user chooses. `custom/README.md` is the seam map.
 
 ## By destination
 
 ### Build-time packages
 
-`build/20-packages-and-services.sh`. Use `dnf5`, always with `-y`, and disable
-any repository you enable. [build/README.md](../../../build/README.md) has the
-phase map.
+There is no `dnf`. The image is assembled from BuildStream elements; a package
+is an element in the `elements/image/deps.bst` stack, or a `kind: manual`
+element that installs one. Prefer an element the base already provides:
+`gnome-build-meta.bst:gnomeos-deps/…` and `freedesktop-sdk.bst:components/…`
+carry most of what a desktop needs. `elements/ublue/` shows the shape of a
+manual element that copies an upstream project's files.
 
-Prefer a package the base already ships. When a COPR is unavoidable,
-`copr_install_isolated` enables and disables it for you.
+Editing the stack is editing `elements/image/deps.bst`; never add content by
+patching a built artifact.
 
 ### Homebrew
 
 Brewfiles in `custom/brew/`, plus a `ujust` recipe so users install it by name.
 [custom/brew/README.md](../../../custom/brew/README.md) has the format.
+`just validate-brewfiles` checks them without evaluating Ruby.
 
 ### Flatpak
 
@@ -58,18 +62,18 @@ directory's README has the semantics.
 ## Removing something
 
 The reverse of adding: delete the line or the file, then check nothing still
-references it. A package removed from the package phase may still arrive as a
-dependency or from an overlay; `bootc container lint` and the image build catch
-the obvious cases.
+references it. A package removed from the stack may still arrive as a dependency
+of another element; `just bst show <element> --deps all` shows what pulls it in.
 
 ## Validate
 
 ```bash
-just validate-brewfiles
-just validate-flatpaks
-just check
-just build
+just check                 # Justfile and every *.just
+just test-unit             # the suite
+just validate-brewfiles    # if custom/brew changed
+just validate-flatpaks     # if custom/flatpaks changed
+just bst build oci/image.bst   # if the image changed
 ```
 
 CI runs `validate-brewfiles`, `validate-flatpaks`, and `validate-justfiles` on
-every pull request.
+every pull request, and the build workflow builds the image.
