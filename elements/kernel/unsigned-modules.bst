@@ -35,3 +35,20 @@ config:
         cp /boot/vmlinuz "%{install-root}/usr/lib/modules/${version}"
       fi
       test -f "%{install-root}/usr/lib/modules/${version}/vmlinuz"
+
+# The copy above flattens the kernel element's domains: vmlinux and System.map
+# arrive from its sandbox as ordinary files, so the image compose's
+# `exclude: [devel, debug]` no longer recognises them and a ~490 MB unstripped
+# vmlinux lands in the image. Re-declare the split here — the same rule
+# gnome-build-meta's kernel and dakota's core/linux-fdsdk.bst carry — so the
+# existing exclusion applies again. Runtime consumers read /sys/kernel/btf/vmlinux,
+# not this file, so nothing needs it.
+public:
+  bst:
+    split-rules:
+      devel:
+        (>):
+          - '%{indep-libdir}/modules/*/System.map'
+      debug:
+        (>):
+          - '%{indep-libdir}/modules/*/vmlinux'
