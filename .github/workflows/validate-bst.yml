@@ -23,6 +23,7 @@ on:
       - "include/**"
       - "project.conf"
       - "Justfile"
+      - ".github/workflows/validate-bst.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
