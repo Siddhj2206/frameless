@@ -1,0 +1,63 @@
+name: Track BuildStream Sources
+
+# Renovate tracks GitHub Actions and container digests, but BuildStream
+# commit/digest refs — the junctions and the git/docker sources — can only be
+# refreshed by BuildStream itself (`bst source track`), because Renovate cannot
+# resolve a git-describe ref. This runs `just track` and opens a PR.
+#
+# Never automerged: a ref bump must build first. Note that a PR opened with the
+# default GITHUB_TOKEN does not trigger other workflows, so its checks may need
+# a manual re-run; a PAT with the `workflow` scope avoids that.
+on:
+  schedule:
+    - cron: "0 6 * * 1" # weekly, Monday 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: track-bst-sources
+  cancel-in-progress: false
+
+jobs:
+  track:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v3
+
+      - name: Track source refs
+        run: just track
+
+      - name: Open a PR if anything moved
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "No source refs moved."
+            exit 0
+          fi
+          git diff --stat
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          branch="auto/track-bst-sources"
+          git checkout -B "${branch}"
+          git add elements/
+          git commit -m "chore(deps): track BuildStream source refs"
+          git push --force-with-lease origin "${branch}"
+          if gh pr view "${branch}" >/dev/null 2>&1; then
+            echo "Existing PR updated."
+          else
+            gh pr create --base main --head "${branch}" \
+              --title "chore(deps): track BuildStream source refs" \
+              --body "Refreshed with \`just track\` (\`bst source track\`). Never automerged: the image must build first."
+          fi

@@ -527,6 +527,36 @@ validate-flatpaks:
     set -euo pipefail
     bash scripts/validate-flatpaks.sh
 
+# Re-resolve every pinned source ref with `bst source track`, then open a PR.
+#
+# Renovate tracks GitHub Actions and container digests, but BuildStream
+# commit/digest refs (the junctions and the git/docker sources) can only be
+# refreshed by BuildStream itself — Renovate cannot resolve a git-describe ref.
+# This is that path. Everything it changes is never automerged.
+#
+# Usage: just track                (all elements below)
+# just track elements/freedesktop-sdk.bst   (one element)
+[group('dev')]
+track *ELEMENTS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    elements=(
+        elements/freedesktop-sdk.bst
+        elements/gnome-build-meta.bst
+        elements/plugins/buildstream-plugins.bst
+        elements/plugins/buildstream-plugins-community.bst
+        elements/runtime/common.bst
+        elements/runtime/brew.bst
+        elements/runtime/brew-tarball.bst
+    )
+    if [ "$#" -gt 0 ]; then
+        elements=("$@")
+    fi
+    for element in "${elements[@]}"; do
+        echo "==> Tracking ${element}"
+        just bst source track "${element}"
+    done
+
 # ── Dev ──────────────────────────────────────────────────────────────
 # Check Justfile syntax (and every *.just).
 [group('dev')]

@@ -8,6 +8,7 @@ name: Validate BuildStream
 # element (gnome-build-meta's signed-modules) whose private signing key is absent
 # from the public repository and so cannot load in any fork.
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main, stable]
     paths:
