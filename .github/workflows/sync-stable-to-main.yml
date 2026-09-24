@@ -13,9 +13,15 @@ on:
   push:
     branches:
       - stable
-  # Normally a no-op. Dispatch it to force the sync after repairing the branch
-  # model by hand.
-  workflow_dispatch:
+  # Deliberately NOT dispatchable. The reusable force-resets the target to the
+  # source when the target has commits the source lacks, and here the source is
+  # `stable` and the target is `main`. If `stable` is ever behind `main`, a
+  # manual run would reset `main` to `stable`. The normal trigger (a push to
+  # `stable`, which only a promotion produces) always leaves the two trees
+  # identical, so the reusable's tree check skips and nothing is pushed.
+  #
+  # To repair a diverged branch model by hand, reconcile `stable` from `main`
+  # (the promotion path), never by dispatching this workflow.
 
 permissions:
   contents: write
