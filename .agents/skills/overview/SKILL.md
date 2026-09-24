@@ -47,12 +47,25 @@ the FSDK junction ref.
 | `Justfile` | `just bst` and the local loop: build, export, boot a VM, tests. |
 | `elements/` | The graph. `desktop/`, `runtime/`, `custom/`, `oci/`, `core/`, `kernel/`, plus the junctions. |
 | `include/` | Shared YAML merged with `(@)`: aliases, os-release, the generated version. |
-| `files/` | Local source payloads (first-boot units, service overrides). |
-| `scripts/` | Repository tooling: the Brewfile and Flatpak validators. |
+| `files/` | The template's local source payloads: first-boot units, service overrides, the fakecap helper. |
+| `scripts/` | Repository tooling: the Brewfile and Flatpak validators, the chunkah metadata tool. |
+| `patches/` | The freedesktop-sdk patch queue, synced from gnome-build-meta. |
+| `plugins/` | The local `chunkah-ownership` BuildStream plugin. |
 | `custom/` | Where an adopter changes the image: Brewfiles, ujust, Flatpaks, files, config. |
 | `tests/` | `contract/` (interfaces the image must satisfy) and `template/` (this repository's build wiring). |
 | `docs/` | `research/` (findings), `learning/` (lessons and records), `agents/` (tracker conventions). |
 | `.github/` | Workflows and Renovate config. |
+
+Each directory above carries a small `README.md` explaining what it holds. Two
+pairs share a leaf name and are easy to confuse:
+
+- **`files/` vs `custom/files/`** — `files/` is the *template's* build input,
+  referenced by an element as `kind: local`; `custom/files/` is the *adopter's*
+  seam, a tree that mirrors `/` and is copied in by `custom/custom.bst`. Editing
+  the first means editing an element; adding to the second does not.
+- **`plugins/` vs `elements/plugins/`** — `plugins/` is the local chunkah plugin
+  (`origin: local` in `project.conf`); `elements/plugins/` holds the junction
+  elements for the upstream plugin packages.
 
 ## Which skill
 
