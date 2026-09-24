@@ -5,7 +5,7 @@ A local BuildStream plugin, registered in `project.conf` under
 
 `chunkah-ownership.{py,yaml}` defines a `kind: chunkah-ownership` element. It
 generates the ownership basis for a compose layer — who owns which path —
-without replaying the layer. `elements/oci/chunkah/frameless.bst` uses it, and
+without replaying the layer. `elements/oci/chunkah/image.bst` uses it, and
 `just chunkify` turns the result into content-chunked layers so updates are
 smaller.
 

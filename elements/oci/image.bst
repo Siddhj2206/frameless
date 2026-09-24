@@ -25,7 +25,7 @@ build-depends:
   - filename: oci/layers/image.bst
     config:
       location: /layer
-  - filename: oci/chunkah/frameless.bst
+  - filename: oci/chunkah/image.bst
     config:
       location: /ownership
   - filename: oci/chunkah-metadata-tool.bst
@@ -41,8 +41,6 @@ variables:
     - include/fsdk-version.yml
   # Seeds /etc/machine-id deterministically; bootc regenerates it on deploy.
   sysroot-seed: b57666f6-0fe5-4310-adff-f256936d164d
-  # The ownership variant name carried into the metadata.
-  ownership-variant: default
 
 config:
   commands:
@@ -114,7 +112,7 @@ config:
       python3 /ownership-tool/ownership-tool/ownership_metadata.py finalize-oci \
         --layout "%{install-root}" --root /layer \
         --basis /ownership/ownership/basis.json \
-        --arch "%{go-arch}" --variant "%{ownership-variant}" \
+        --arch "%{go-arch}" --variant default \
         --output /ownership/final.json
       mkdir -p "%{install-root}/.frameless"
       cp /ownership/final.json "%{install-root}/.frameless/ownership-final.json"

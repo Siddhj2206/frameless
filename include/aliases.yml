@@ -1,8 +1,10 @@
 # Source aliases.
 #
 # Named URL prefixes used by element sources, so a URL appears once and can be
-# changed without touching every element. Add your own as needed; `pypi`,
-# `gitlab`, and `gnome` are used by the junction elements.
+# changed without touching every element. This table is deliberately broad: it
+# is a convenience for adopters, so that an element copied from freedesktop-sdk,
+# gnome-build-meta or dakota resolves its URLs without a trip to add an alias
+# first. Add your own here too.
 #
 # See: https://docs.buildstream.build/master/format_project.html
 aliases:

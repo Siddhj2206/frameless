@@ -36,7 +36,7 @@ environment:
   DOCUMENTATION_URL: "%{image-repo-url}/blob/main/README.md"
   SUPPORT_URL: "%{image-repo-url}/issues"
   BUG_REPORT_URL: "%{image-repo-url}/issues/new"
-  CODE_NAME: "%{image-code-name}"
+  CODE_NAME: "%{project-name}"
   ID: "%{project-name}"
   ID_LIKE: "org.gnome.os"
 

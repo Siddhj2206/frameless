@@ -23,12 +23,9 @@ sources:
 
 build-depends:
   - core/sandbox-tools.bst
-  # `just` generates the ujust shell completions below.
-  - gnome-build-meta.bst:gnomeos-deps/just.bst
 
 depends:
   - freedesktop-sdk.bst:public-stacks/runtime-minimal.bst
-  - freedesktop-sdk.bst:components/sed.bst
 
 variables:
   strip-binaries: ""
@@ -42,7 +39,9 @@ config:
         install -m644 brew/*.Brewfile -t "%{install-root}%{datadir}/ublue-os/homebrew/"
       fi
     # ujust recipes: concatenate every *.just, recursively, into the one file
-    # the base ublue just imports, then generate the shell completions.
+    # the base ublue just imports. The shell completions are generated once, in
+    # runtime/common.bst, which owns the base recipes — generating them here too
+    # would install the same three paths from two elements (an overlap).
     - |
       shopt -s globstar nullglob
       install -d "%{install-root}%{datadir}/ublue-os/just"
@@ -52,13 +51,6 @@ config:
         cat "${recipe}" >> "${out}"
         printf '\n' >> "${out}"
       done
-      install -d \
-        "%{install-root}%{datadir}/bash-completion/completions" \
-        "%{install-root}%{datadir}/zsh/site-functions" \
-        "%{install-root}%{datadir}/fish/vendor_completions.d"
-      just --completions bash | sed -E 's/([\(_" ])just/\1ujust/g' > "%{install-root}%{datadir}/bash-completion/completions/ujust"
-      just --completions zsh | sed -E 's/([\(_" ])just/\1ujust/g' > "%{install-root}%{datadir}/zsh/site-functions/_ujust"
-      just --completions fish | sed -E 's/([\(_" ])just/\1ujust/g' > "%{install-root}%{datadir}/fish/vendor_completions.d/ujust.fish"
     # Flatpak first-boot preinstalls.
     - |
       if compgen -G "flatpaks/*.preinstall" >/dev/null; then

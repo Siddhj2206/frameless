@@ -2,8 +2,8 @@
 # OCI layer: filtered root
 ###############################################################################
 # Selects the runtime filesystem out of the composed stack, dropping the
-# development, debug, and static-blocklist domains. One layer for v1; chunking
-# is deliberately out of scope.
+# development, debug, and static-blocklist domains. It is one layer; `just
+# chunkify` turns it into content-chunked layers at export time.
 ###############################################################################
 kind: compose
 

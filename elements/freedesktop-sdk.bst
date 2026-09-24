@@ -5,9 +5,9 @@
 # reference its components as freedesktop-sdk.bst:components/<name>.bst.
 #
 # Update the pin with:
-#   just bst source track elements/freedesktop-sdk.bst
-# The `track` glob follows the 26.08 stream. Renovate keeps the ref fresh once
-# its custom manager lands (#22).
+#   just track elements/freedesktop-sdk.bst
+# The `track` glob follows the 26.08 stream; the weekly Track BuildStream
+# Sources workflow runs it and opens a PR.
 ###############################################################################
 kind: junction
 
@@ -34,9 +34,10 @@ config:
         bootstrap_build_arch: 'aarch64'
 
   # Overrides replace freedesktop-sdk components with gnome-build-meta's
-  # versions so the desktop stack is coherent. Ported from dakota; the exact
-  # list is tuned during the first build. Add entries here as needed, for
-  # example:
+  # versions so the desktop stack is coherent. This list must match
+  # gnome-build-meta's own freedesktop-sdk junction exactly: a missing or extra
+  # entry makes the graph diverge from the public caches and rebuilds from
+  # source. `just patch-sync` refreshes the patch queue alongside it.
   overrides:
     components/at-spi2-core.bst: gnome-build-meta.bst:sdk/at-spi2-core.bst
     components/cairo.bst: gnome-build-meta.bst:sdk/cairo.bst

@@ -35,8 +35,6 @@ export OCI_IMAGE_REVISION := env("OCI_IMAGE_REVISION", "")
 # version. e.g. "26.08.1". The `bst` recipe writes it into
 # include/fsdk-version.yml for elements to read as %{fsdk-version}.
 export fsdk_version := `grep -E '^\s*ref:' elements/freedesktop-sdk.bst | head -1 | sed -E 's/.*freedesktop-sdk-//; s/-[0-9]+-g[0-9a-f]+$//'`
-# The exact junction ref, for provenance and release notes.
-export fsdk_ref := `grep -E '^\s*ref:' elements/freedesktop-sdk.bst | head -1 | sed -E 's/^\s*ref:\s*//'`
 
 # ── BuildStream wrapper ──────────────────────────────────────────────
 # Run any bst command inside the pinned bst2 container via podman, so no local
