@@ -39,7 +39,7 @@ jobs:
       - name: Track source refs
         run: just track
 
-      - name: Open a PR if anything moved
+      - name: Open PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -67,7 +67,7 @@ jobs:
       # GitHub holds every check run it creates for a bot-authored pull request
       # in `action_required` until someone approves it. Approve them seconds
       # after the branch is pushed, as promote-main-to-stable.yml does.
-      - name: Approve the checks GitHub holds for the bot PR
+      - name: Approve bot PR checks
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BRANCH: auto/track-bst-sources

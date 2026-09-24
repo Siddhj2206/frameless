@@ -62,7 +62,7 @@ jobs:
       attestations: write
 
     steps:
-      - name: Prepare environment
+      - name: Environment
         run: |
           echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> "${GITHUB_ENV}"
           echo "IMAGE_NAME=${IMAGE_NAME,,}" >> "${GITHUB_ENV}"
@@ -71,7 +71,7 @@ jobs:
       # keeps generate-tags on the "testing" stream so it never emits
       # stable-daily* aliases that would collide with production; the
       # Finalize branch tags step renames them to stable-testing-*.
-      - name: Determine image tag
+      - name: Image tag
         id: determine-tag
         shell: bash
         env:
@@ -112,7 +112,7 @@ jobs:
       # Restore and save are separate steps because `save-always` is deprecated
       # and never worked as intended: a failed run cached nothing. The save step
       # below carries `if: always()` instead.
-      - name: Restore BuildStream cache
+      - name: Restore cache
         id: bst-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
@@ -121,11 +121,11 @@ jobs:
           restore-keys: |
             bst-${{ runner.os }}-
 
-      - name: Capture build timestamp
+      - name: Build timestamp
         id: timestamp
         run: echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
-      - name: Build image with BuildStream
+      - name: Build image
         id: build-image
         env:
           BUILD_IMAGE_NAME: ${{ env.IMAGE_NAME }}
@@ -149,14 +149,14 @@ jobs:
       # failing run is the common case, and what it built is exactly what the
       # next run should not repeat. The key is the same expression as the
       # restore step, so a run that already hit the exact key is a no-op.
-      - name: Save BuildStream cache
+      - name: Save cache
         if: always()
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.cache/buildstream
           key: bst-${{ runner.os }}-${{ hashFiles('project.conf', 'elements/freedesktop-sdk.bst', 'elements/gnome-build-meta.bst') }}
 
-      - name: Get version label
+      - name: Version label
         id: version
         shell: bash
         env:
@@ -172,7 +172,7 @@ jobs:
       # image-registry-owner in project.conf. If that does not match where CI
       # publishes, `bootc upgrade` points at a repository that does not exist,
       # and nothing else would catch it. Fail here instead.
-      - name: Verify the upgrade origin matches the publish target
+      - name: Verify upgrade origin
         shell: bash
         env:
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
@@ -207,7 +207,7 @@ jobs:
       # stable-testing-*, keeps the bare :testing tag (the factory release gate
       # in reusable-promote-squash.yml resolves digests from it), and guarantees
       # the mutable consumer tag (:stable / :stable-testing) is always published.
-      - name: Finalize branch tags
+      - name: Finalize tags
         id: branch-tags
         shell: bash
         env:
@@ -269,18 +269,32 @@ jobs:
           certificate-identity-regexp: https://github.com/${{ github.repository }}/.github/workflows/
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build telemetry summary
+      - name: Telemetry
         shell: bash
+        env:
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          DEFAULT_TAG: ${{ env.DEFAULT_TAG }}
+          IMAGE_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+          DIGEST: ${{ steps.push.outputs.digest }}
         run: |
-          IMAGE_SIZE=$(sudo podman image inspect "localhost/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}" \
-            --format '{{.Size}}' 2>/dev/null || echo "0")
-          IMAGE_SIZE_MB=$(( IMAGE_SIZE / 1024 / 1024 ))
-          LAYER_COUNT=$(sudo podman image inspect "localhost/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}" \
-            --format '{{len .RootFS.Layers}}' 2>/dev/null || echo "?")
+          set -uo pipefail
+          local_ref="localhost/${IMAGE_NAME}:${DEFAULT_TAG}"
+          uncompressed=$(sudo podman image inspect "${local_ref}" --format '{{.Size}}' 2>/dev/null || echo 0)
+          layers=$(sudo podman image inspect "${local_ref}" --format '{{len .RootFS.Layers}}' 2>/dev/null || echo '?')
+
+          # Compressed is the number users download, and it only exists in the
+          # registry: read the pushed manifest back and sum its layer sizes.
+          # Referenced by digest rather than tag, so a concurrent push cannot
+          # change what is measured.
+          compressed=$(skopeo inspect --raw "docker://${IMAGE_REGISTRY}/${IMAGE_NAME}@${DIGEST}" 2>/dev/null \
+            | python3 -c 'import json,sys; print(sum(l["size"] for l in json.load(sys.stdin)["layers"]))' 2>/dev/null || echo 0)
+
+          to_mb() { echo $(( ${1:-0} / 1024 / 1024 )); }
 
           {
-            echo "## Build Telemetry: ${{ env.IMAGE_NAME }}"
+            echo "## Build Telemetry: ${IMAGE_NAME}"
             echo ""
-            echo "**Image size (uncompressed):** ${IMAGE_SIZE_MB} MB"
-            echo "**Layer count:** ${LAYER_COUNT}"
-          } >> "$GITHUB_STEP_SUMMARY"
+            echo "**Compressed (what users download):** $(to_mb "${compressed}") MB"
+            echo "**Uncompressed:** $(to_mb "${uncompressed}") MB"
+            echo "**Layers:** ${layers}"
+          } >> "${GITHUB_STEP_SUMMARY}"

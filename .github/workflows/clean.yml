@@ -17,7 +17,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Resolve package name
+      - name: Package name
         id: package
         shell: bash
         run: |
@@ -27,7 +27,7 @@ jobs:
           name="${{ github.event.repository.name }}"
           echo "name=${name,,}" >> "${GITHUB_OUTPUT}"
 
-      - name: Cleanup old images
+      - name: Clean up images
         uses: projectbluefin/actions/bootc-build/ghcr-cleanup@9e1acbe66ec87cd07b573e1671a3ecaee7df73d0 # v1
         with:
           packages: ${{ steps.package.outputs.name }}

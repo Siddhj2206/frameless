@@ -49,5 +49,5 @@ jobs:
       # `just bst` runs bst in the pinned bst2 container, which needs podman and
       # /dev/fuse; the ubuntu runner has both. It also regenerates
       # include/fsdk-version.yml from the FSDK junction ref.
-      - name: Load the image graph
+      - name: Load graph
         run: just bst show oci/image.bst --deps none

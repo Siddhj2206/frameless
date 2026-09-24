@@ -96,7 +96,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Rebuild the branch when its tree has drifted from main
+      - name: Rebuild drifted branch
         shell: bash
         run: |
           set -euo pipefail
@@ -142,7 +142,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       PROMOTION_BRANCH: auto/promote-main-to-stable
     steps:
-      - name: Find the open promotion PR
+      - name: Find promotion PR
         id: find
         shell: bash
         run: |
@@ -178,7 +178,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       PROMOTION_BRANCH: auto/promote-main-to-stable
     steps:
-      - name: Approve pending runs on the promotion branch
+      - name: Approve pending runs
         shell: bash
         run: |
           set -euo pipefail

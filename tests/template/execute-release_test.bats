@@ -49,7 +49,8 @@ setup() {
 }
 
 @test "execute-release: fails the run on a non-promotion push to stable" {
-	run grep -A3 -F 'Refuse a non-promotion push to stable' "${WORKFLOW}"
+	# The step name is the locator; if it is renamed, update it here.
+	run grep -A3 -F 'Reject non-promotion push' "${WORKFLOW}"
 	[ "$status" -eq 0 ]
 	[[ "$output" == *"steps.check.outputs.is-promotion != 'true'"* ]]
 }

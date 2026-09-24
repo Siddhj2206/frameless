@@ -24,7 +24,7 @@ jobs:
     outputs:
       is-promotion: ${{ steps.check.outputs.is-promotion }}
     steps:
-      - name: Accept a promotion commit or manual recovery
+      - name: Verify promotion commit
         id: check
         env:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
@@ -53,7 +53,7 @@ jobs:
       # receives no builds, so an image can only reach :stable through the
       # candidate digest this workflow promotes. Fail loudly instead of
       # reporting success without promoting anything.
-      - name: Refuse a non-promotion push to stable
+      - name: Reject non-promotion push
         if: steps.check.outputs.is-promotion != 'true'
         shell: bash
         run: |

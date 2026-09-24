@@ -47,6 +47,6 @@ jobs:
           just --version
       - name: Install bats
         run: sudo apt-get update && sudo apt-get install -y bats
-      - name: Run unit tests
+      - name: Unit tests
         # `just test-unit` is the single definition of how the suite runs.
         run: just test-unit
