@@ -99,7 +99,7 @@ arguments. Use a separator like `--`.
 
 ## Where to go next
 
-- The image graph and the local loop → the `build` skill.
+- The image graph, its caches, and the local loop → the `build` skill.
 - Adding a package, app, or command → the `customize` skill.
 - CI, releases, and the two-branch model → the `ci` skill.
 - Something is failing → the `troubleshooting` skill.
