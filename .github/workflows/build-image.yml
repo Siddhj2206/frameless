@@ -172,7 +172,9 @@ jobs:
           ref="localhost/${IMAGE_NAME}:${DEFAULT_TAG}"
           mount=$(sudo podman image mount "${ref}")
           trap 'sudo podman image umount "${ref}" >/dev/null 2>&1 || true' EXIT
-          actual=$(sed -n 's/^IMAGE_REF="\(.*\)"$/\1/p' "${mount}/usr/lib/os-release")
+          # The mount belongs to the privileged store, so read it with the same
+          # privilege — as `just chunkify` does, for the same reason.
+          actual=$(sudo sed -n 's/^IMAGE_REF="\(.*\)"$/\1/p' "${mount}/usr/lib/os-release")
           expected="ostree-image-signed:docker://${IMAGE_REGISTRY}/${IMAGE_NAME}"
           if [ "${actual}" != "${expected}" ]; then
             echo "::error::the image's upgrade origin is '${actual}' but CI publishes to '${expected}'. Set image-vendor in project.conf to '${IMAGE_REGISTRY##*/}'."
