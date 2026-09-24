@@ -16,6 +16,8 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # Approving the check runs GitHub holds for a bot-authored PR.
+  actions: write
 
 concurrency:
   group: track-bst-sources
@@ -60,4 +62,39 @@ jobs:
             gh pr create --base main --head "${branch}" \
               --title "chore(deps): track BuildStream source refs" \
               --body "Refreshed with \`just track\` (\`bst source track\`). Never automerged: the image must build first."
+          fi
+
+      # GitHub holds every check run it creates for a bot-authored pull request
+      # in `action_required` until someone approves it. Approve them seconds
+      # after the branch is pushed, as promote-main-to-stable.yml does.
+      - name: Approve the checks GitHub holds for the bot PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: auto/track-bst-sources
+        run: |
+          set -euo pipefail
+          runs_filter=".workflow_runs[] | select(.head_branch == \"${BRANCH}\") | select(.actor.login == \"github-actions[bot]\") | .id"
+          approved=0
+          for attempt in 1 2 3 4 5 6; do
+            mapfile -t run_ids < <(
+              gh api "repos/${GITHUB_REPOSITORY}/actions/runs?status=action_required&per_page=100" \
+                --jq "${runs_filter}"
+            )
+            if [ "${#run_ids[@]}" -gt 0 ]; then
+              for run_id in "${run_ids[@]}"; do
+                if gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/approve" >/dev/null; then
+                  echo "Approved run ${run_id}"
+                  approved=$((approved + 1))
+                else
+                  echo "::warning::Could not approve run ${run_id}"
+                fi
+              done
+              break
+            fi
+            if [ "${attempt}" -lt 6 ]; then
+              sleep 15
+            fi
+          done
+          if [ "${approved}" -eq 0 ]; then
+            echo "::notice::No pending runs matched; nothing to approve."
           fi
