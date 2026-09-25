@@ -120,6 +120,8 @@ jobs:
       # graph; this persists what we build on top of it, so a run that only
       # changes one element does not rebuild the world.
       - name: Restore cache
+        # The cache is an optimisation; a registry problem must not fail a build.
+        continue-on-error: true
         env:
           BST_CACHE_REF: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}-cache
           BST_CACHE_KEY: bst-${{ runner.os }}-${{ hashFiles('project.conf', 'elements/freedesktop-sdk.bst', 'elements/gnome-build-meta.bst') }}
@@ -158,6 +160,8 @@ jobs:
       # the complete one for a graph.
       - name: Save cache
         if: always()
+        # A push failure must never block the publish that follows.
+        continue-on-error: true
         env:
           BST_CACHE_REF: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}-cache
           BST_CACHE_KEY: bst-${{ runner.os }}-${{ hashFiles('project.conf', 'elements/freedesktop-sdk.bst', 'elements/gnome-build-meta.bst') }}

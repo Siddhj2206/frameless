@@ -11,6 +11,10 @@
 # (see docs/research/10-remote-availability-cache-pruning.md) but a full
 # snapshot is simple and correct, and GHCR does not charge for it.
 #
+# The cache is an optimisation: a failure here must never fail the build. Pull
+# treats every problem as "start cold"; push reports the error but the workflow
+# carries `continue-on-error`, so the image still publishes.
+#
 # Environment:
 #   BST_CACHE_REF  required. e.g. ghcr.io/owner/repo-cache
 #   BST_CACHE_KEY  optional. A graph-derived key; when set, a second tag is
@@ -26,10 +30,20 @@ CACHE_DIR="${BST_CACHE_DIR:-${HOME}/.cache/buildstream}"
 REF="${BST_CACHE_REF:-}"
 KEY="${BST_CACHE_KEY:-}"
 
+# Set by push() and read by the EXIT trap; must outlive the function.
+tmp=""
+
 usage() {
     echo "usage: $(basename "$0") {pull|push}" >&2
     exit 2
 }
+
+cleanup() {
+    if [ -n "${tmp}" ]; then
+        rm -rf "${tmp}"
+    fi
+}
+trap cleanup EXIT
 
 require_ref() {
     if [ -z "${REF}" ]; then
@@ -55,29 +69,36 @@ login() {
 }
 
 # Try the graph key first, then the rolling tag: the rolling one may be from a
-# different graph, but BuildStream still uses whatever artifacts match.
+# different graph, but BuildStream still uses whatever artifacts match. Every
+# failure is a cold start rather than an error — see the header.
 pull() {
     require_ref
     require_tools oras tar zstd
     login
 
-    local tag tmp
+    local tag
     for tag in ${KEY:+"${KEY}"} latest; do
-        if ! oras manifest fetch "${REF}:${tag}" >/dev/null 2>&1; then
-            continue
-        fi
-        echo "==> Restoring BuildStream cache from ${REF}:${tag}"
+        echo "==> Trying ${REF}:${tag}"
         tmp="$(mktemp -d)"
-        oras pull "${REF}:${tag}" -o "${tmp}"
-        mkdir -p "${CACHE_DIR}"
-        # The CAS is large; stream it rather than unpacking to an intermediate.
-        zstd -d -c "${tmp}/cache.tar.zst" | tar -xf - -C "${CACHE_DIR}"
+        # Attempt the pull directly rather than probing with `oras manifest
+        # fetch`, whose subcommand varies across oras CLI versions.
+        if oras pull "${REF}:${tag}" -o "${tmp}" >/dev/null 2>&1 &&
+            [ -f "${tmp}/cache.tar.zst" ]; then
+            mkdir -p "${CACHE_DIR}"
+            if zstd -d -c "${tmp}/cache.tar.zst" | tar -xf - -C "${CACHE_DIR}"; then
+                rm -rf "${tmp}"
+                tmp=""
+                echo "==> Restored from ${REF}:${tag}"
+                return 0
+            fi
+            echo "==> Extracting ${REF}:${tag} failed; trying the next tag"
+        fi
+
         rm -rf "${tmp}"
-        echo "==> Restored"
-        return 0
+        tmp=""
     done
 
-    echo "==> No cache at ${REF}; starting cold"
+    echo "==> No usable cache at ${REF}; starting cold"
 }
 
 # latest is written on every run, success or failure, so a failed build still
@@ -89,21 +110,26 @@ push() {
     require_tools oras tar zstd
     login
 
-    local tmp
     tmp="$(mktemp -d)"
-    trap 'rm -rf "${tmp}"' EXIT
 
     echo "==> Packing ${CACHE_DIR}"
     # cas/staging and cas/tmp are transient scratch; everything else is state.
-    tar -cf - -C "${CACHE_DIR}" --exclude 'cas/staging' --exclude 'cas/tmp' . \
-        | zstd -T0 > "${tmp}/cache.tar.zst"
+    tar -cf - -C "${CACHE_DIR}" --exclude 'cas/staging' --exclude 'cas/tmp' . |
+        zstd -T0 >"${tmp}/cache.tar.zst"
     du -h "${tmp}/cache.tar.zst" | awk '{print "    " $1}'
 
-    oras push "${REF}:latest" "${tmp}/cache.tar.zst:${MEDIA_TYPE}" >/dev/null
+    # oras rejects absolute paths, so push from inside the temp directory.
+    (
+        cd "${tmp}"
+        oras push "${REF}:latest" "cache.tar.zst:${MEDIA_TYPE}" >/dev/null
+    )
     echo "==> Pushed ${REF}:latest"
 
     if [ -n "${KEY}" ]; then
-        oras push "${REF}:${KEY}" "${tmp}/cache.tar.zst:${MEDIA_TYPE}" >/dev/null
+        (
+            cd "${tmp}"
+            oras push "${REF}:${KEY}" "cache.tar.zst:${MEDIA_TYPE}" >/dev/null
+        )
         echo "==> Pushed ${REF}:${KEY}"
     fi
 }
