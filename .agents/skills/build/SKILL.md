@@ -51,11 +51,17 @@ desktop from source.
 
 **The project name is not in the key, and a junction boundary resets the
 environment.** GBM's elements see GBM's `project.conf`, not ours, so our identity
-variables cannot perturb their keys. Only what we pass on the junction element
-crosses: the ref, the options, the plugin pins, and the overrides. Any of those
-differing from GBM's own junction changes the key of everything beneath it, and
-those elements rebuild from source — hours, not minutes. This is the rule behind
+variables cannot perturb their keys. What we pass on the junction element —
+options, plugin pins, overrides, the patch queue — is the environment beneath it,
+and any of it differing from GBM's own junction changes the key of *everything*
+beneath, rebuilding from source: hours, not minutes. This is the rule behind
 `elements/freedesktop-sdk.bst`'s "must match gnome-build-meta exactly".
+
+The junction's `ref` is the exception, and it is cheap: bumping it only changes
+the sources of the elements those upstream commits touched, because the elements
+inside the junction are keyed in the junction's own project. Measured
+2026-09-25: `gnome-build-meta` `51.0-3` → `51.0-5` processed **9** elements and
+skipped 769. A junction bump is not automatically "the big one".
 
 Two caches, easily conflated:
 

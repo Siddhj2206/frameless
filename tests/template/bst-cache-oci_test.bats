@@ -27,6 +27,7 @@ printf '%s\n' "$*" >>"${ORAS_LOG}"
 case "${1:-}" in
 login) exit 0 ;;
 pull)
+	ref="${2:-}"
 	out=""
 	while [ "$#" -gt 0 ]; do
 		case "$1" in
@@ -38,6 +39,10 @@ pull)
 		esac
 	done
 	attempts="$(grep -c '^pull ' "${ORAS_LOG}" || true)"
+	if [ "${ORAS_NOT_FOUND:-0}" = "1" ]; then
+		echo "Error response from registry: ${ref}: not found" >&2
+		exit 1
+	fi
 	if [ "${attempts}" -le "${ORAS_FAILS:-0}" ]; then
 		echo "stub: transient failure (attempt ${attempts})" >&2
 		exit 1
@@ -109,6 +114,18 @@ teardown() {
 	[ "$status" -eq 0 ]
 	[[ "${output}" == *"No usable cache at example.test/cache; starting cold"* ]]
 	[ "$(grep -c '^pull ' "${ORAS_LOG}")" -eq 3 ]
+}
+
+@test "cache pull: a missing tag is not retried" {
+	export BST_CACHE_KEY="bst-absent-key"
+	export ORAS_NOT_FOUND=1
+
+	run "${SCRIPT}" pull
+	[ "$status" -eq 0 ]
+	[[ "${output}" == *"example.test/cache:bst-absent-key does not exist; trying the next tag"* ]]
+	[[ "${output}" == *"example.test/cache:latest does not exist; trying the next tag"* ]]
+	[[ "${output}" == *"No usable cache at example.test/cache; starting cold"* ]]
+	[ "$(grep -c '^pull ' "${ORAS_LOG}")" -eq 2 ]
 }
 
 @test "cache pull: a tag with no archive does not retry" {

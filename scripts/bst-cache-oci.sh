@@ -93,12 +93,21 @@ pull() {
             # oras's own error: without it a lost cache is undiagnosable.
             if ! oras pull "${REF}:${tag}" -o "${tmp}" >/dev/null 2>"${tmp}/oras.err"; then
                 reason="$(tr '\r' '\n' <"${tmp}/oras.err" | grep -v '^[[:space:]]*$' | tail -3 || true)"
+                rm -rf "${tmp}"
+                tmp=""
+
+                # A missing tag is definitive, and it is the normal case for the
+                # graph key on the first run after any junction change. Retrying
+                # it just puts three alarming failures in the log.
+                if printf '%s' "${reason}" | grep -qi 'not found'; then
+                    echo "==> ${REF}:${tag} does not exist; trying the next tag"
+                    break
+                fi
+
                 echo "==> Pull of ${REF}:${tag} failed:"
                 if [ -n "${reason}" ]; then
                     printf '%s\n' "${reason}" | sed 's/^/    /'
                 fi
-                rm -rf "${tmp}"
-                tmp=""
                 if [ "${attempt}" -lt "${PULL_ATTEMPTS}" ]; then
                     sleep 15
                 fi
