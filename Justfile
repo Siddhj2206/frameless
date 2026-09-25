@@ -542,33 +542,41 @@ validate-flatpaks:
 
 # Re-resolve every pinned source ref with `bst source track`, then open a PR.
 #
-# Renovate tracks GitHub Actions and container digests, but BuildStream
-# commit/digest refs (the junctions and the git/docker sources) can only be
-# refreshed by BuildStream itself — Renovate cannot resolve a git-describe ref.
-# This is that path. Everything it changes is never automerged.
+# BuildStream commit/digest refs — the junctions and the git/docker sources —
+# can only be refreshed by BuildStream itself: `track:` is BuildStream's
+# symbolic-tracking field and only `bst source track` resolves it, across every
+# source kind. Renovate cannot. See docs/research/11-renovate-config.md.
 #
-# Usage: just track                (all elements below)
-# just track elements/freedesktop-sdk.bst   (one element)
+# Tracking is grouped (scripts/bst-track-groups.sh) so that a junction bump —
+# which rebuilds the world — lands in its own pull request, apart from a cheap
+# runtime bump. Nothing here is ever automerged.
+#
+# Usage: just track                (every group)
+# just track gnome-build-meta       (one group)
 [group('dev')]
-track *ELEMENTS:
+track *GROUPS:
     #!/usr/bin/env bash
     set -euo pipefail
-    elements=(
-        freedesktop-sdk.bst
-        gnome-build-meta.bst
-        plugins/buildstream-plugins.bst
-        plugins/buildstream-plugins-community.bst
-        runtime/common.bst
-        runtime/brew.bst
-        runtime/brew-tarball.bst
-    )
-    if [ "$#" -gt 0 ]; then
-        elements=("$@")
+    if [ -n "{{ GROUPS }}" ]; then
+        groups=({{ GROUPS }})
+    else
+        mapfile -t groups < <(scripts/bst-track-groups.sh)
     fi
-    for element in "${elements[@]}"; do
-        echo "==> Tracking ${element}"
-        just bst source track "${element}"
+    for group in "${groups[@]}"; do
+        # Assigned, not process-substituted: an unknown group must fail here
+        # rather than fall through to `bst source track` with no elements, which
+        # tracks the whole project.
+        listed="$(scripts/bst-track-groups.sh "${group}")"
+        mapfile -t elements <<<"${listed}"
+        printf '==> %s: %s\n' "${group}" "${elements[*]}"
+        just bst source track "${elements[@]}"
     done
+
+# The source-track groups, one per line: an element's directory under
+# elements/, or a root element's own name. See scripts/bst-track-groups.sh.
+[group('dev')]
+track-groups:
+    @scripts/bst-track-groups.sh
 
 # Re-sync patches/freedesktop-sdk (and its manifest) from gnome-build-meta at
 # the pinned junction sha, and write the manifest `patch-drift-check` verifies

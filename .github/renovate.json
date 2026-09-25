@@ -4,7 +4,8 @@
   "prHourlyLimit": 10,
   "prConcurrentLimit": 20,
   "recreateWhen": "always",
-  "rebaseWhen": "auto",
+  "rebaseWhen": "conflicted",
+  "osvVulnerabilityAlerts": true,
   "customManagers": [
     {
       "customType": "regex",
@@ -29,15 +30,6 @@
     },
     {
       "customType": "regex",
-      "description": "BuildStream elements: any value annotated with a '# renovate:' comment on the preceding line. Covers pinned tarball URLs and tool versions. Commit/digest refs that Renovate cannot resolve are refreshed by `just track` instead.",
-      "managerFilePatterns": ["/\\.bst$/", "/^Justfile$/"],
-      "matchStrings": [
-        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>\\S+))?(?: extractVersion=(?<extractVersion>\\S+))?\\s+[^\\n]*?[:=]\\s*\"?(?<currentValue>[\\w][\\w.+-]*)\"?"
-      ],
-      "versioningTemplate": "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}"
-    },
-    {
-      "customType": "regex",
       "description": "Track pinned tool versions in workflow env vars.",
       "managerFilePatterns": ["/^\\.github/workflows/.+\\.yml$/"],
       "matchStrings": [
@@ -47,6 +39,12 @@
   ],
   "packageRules": [
     {
+      "description": "Group non-major GitHub Actions updates into one pull request: they are the same class of change and automerge together. Majors stay separate, below.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["digest", "pin", "pinDigest", "patch", "minor"],
+      "groupName": "github-actions (non-major)"
+    },
+    {
       "description": "Automerge GitHub Actions digest/pin/patch/minor bumps once checks pass. These SHAs run in jobs holding packages:write and id-token:write, so this is the deliberate trade for zero dependency toil.",
       "matchManagers": ["github-actions"],
       "matchUpdateTypes": ["digest", "pin", "pinDigest", "patch", "minor"],
@@ -55,9 +53,9 @@
       "automergeStrategy": "squash"
     },
     {
-      "description": "BuildStream pins (elements/ and Justfile container images) never automerge: a ref or digest must be refreshed with `just track` (which runs `bst source track`) and the image must build first.",
+      "description": "The bst2 runner digest never automerges: it must stay at least as new as project.conf's min-version, and the image must build first. BuildStream refs are not Renovate's to move at all — `just track` runs `bst source track`, because `track:` is BuildStream's own field. See docs/research/11-renovate-config.md.",
       "matchManagers": ["custom.regex"],
-      "matchFileNames": ["**/*.bst", "Justfile"],
+      "matchFileNames": ["Justfile"],
       "automerge": false,
       "labels": ["dependencies", "buildstream"]
     },

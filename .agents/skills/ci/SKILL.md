@@ -23,7 +23,8 @@ description: >-
 | `validate-renovate.yml` | pull request | Renovate config. |
 | `unit-tests.yml` | push, pull request | The bats suite. |
 | `renovate.yml` | schedule, config change | Runs Renovate. |
-| `clean.yml` | schedule | Deletes images older than 90 days. |
+| `track-bst-sources.yml` | weekly schedule, dispatch | Refreshes BuildStream refs with `bst source track`, one PR per group. |
+| `clean.yml` | daily schedule | Prunes old images and the cache package. |
 
 Most are thin callers of reusable workflows in `projectbluefin/actions`.
 
@@ -63,13 +64,15 @@ There is no Containerfile anywhere in the repository.
 
 Caching: `project.conf` lists three public **read-only** caches (gbm.gnome.org,
 cache.projectbluefin.io, cache.freedesktop-sdk.io) that we pull from and never
-push to. Our own artifacts are persisted with `actions/cache` on
-`~/.cache/buildstream`, with `save-always: true` — without it the post-step only
-writes the cache when the job succeeds, so a failed build caches nothing. Two
-limits remain: GitHub caps a repository's cache at 10 GB (a full GNOME CAS is
-larger, so the cache is partial), and there is no writable remote CAS as dakota
-has. A writable cache is the follow-up —
-`docs/research/06-ci-caching-personal-account.md`.
+push to. Our own CAS travels as a single OCI artifact on GHCR (`<repo>-cache`),
+moved by `scripts/bst-cache-oci.sh` and wrapped by `just cache-pull` /
+`just cache-push`. Push writes `:latest` on every run, success or failure, so a
+failed build still warms the next one, and the graph-key tag only when the
+caller passes one — the workflow does, on success, so a matching graph can be
+preferred. Both workflow steps are `continue-on-error`: the cache is an
+optimisation, and a cold start is always valid. `clean.yml` prunes the package
+on a shorter clock than the images. The delta-selection optimisation is
+`docs/research/10-remote-availability-cache-pruning.md`.
 
 `validate-bst.yml` runs `bst show oci/image.bst --deps none`. It loads the whole
 graph without building, so a load error fails in minutes rather than in the
@@ -92,10 +95,34 @@ gate. The README has the command to verify an image.
 
 ## Renovate
 
-Self-hosted through `projectbluefin/actions`, running every six hours. It pins
-GitHub Actions to SHAs and updates image digests. The policy lives in
-`.github/renovate.json`: updates below a major automerge once checks pass;
-majors wait for a pull request.
+Self-hosted through `projectbluefin/actions`, running every six hours. The policy
+lives in `.github/renovate.json`. Non-major GitHub Actions updates are grouped
+into one pull request and automerge once checks pass; majors wait for a human.
+OSV vulnerability alerts are on.
+
+Renovate owns what it has a datasource for: GitHub Actions, pre-commit hooks,
+and container digests — the `bst2` runner in the Justfile, plus any version
+annotated with a `# renovate:` comment. It does **not** own BuildStream refs:
+`track:` is BuildStream's own symbolic-tracking field and only `bst source track`
+resolves it, across git, docker, and pypi sources alike. `just track` runs that,
+grouped by element directory, and `track-bst-sources.yml` opens one pull request
+per group so a junction bump never rides along with a cheap runtime bump. There
+is deliberately no `.bst` Renovate manager: one would match nothing and imply an
+ownership Renovate does not have. The evidence is
+`docs/research/11-renovate-config.md`.
+
+The tracker force-pushes `auto/track-bst-<group>` with a lease, so it fetches the
+branch first: the CI checkout carries no remote-tracking ref for it, and
+`--force-with-lease` refuses to push without one (`stale info`). The original
+single-PR version had the same latent bug; it only worked because it never ran
+twice.
+
+frameless does not extend `projectbluefin/renovate-config`. It is a template: a
+fork must not inherit another organisation's dependency policy, so the patterns
+are copied deliberately and the config stays self-contained.
+
+The `bst2` runner digest never automerges: it must stay at least as new as
+`project.conf`'s `min-version`, and the image must build first.
 
 Renovate needs the `RENOVATE_TOKEN` secret and auto-merge enabled. Both are
 onboarding steps.

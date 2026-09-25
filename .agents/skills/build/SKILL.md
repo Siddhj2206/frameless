@@ -15,7 +15,10 @@ the `arch` option, the identity variables, the read-only public caches, the
 plugin junctions, and `defaults.targets` (the OCI image).
 
 The two junctions are pinned in their own elements. Their `track`/`ref` pairs are
-the base pin; `Renovate` moves them. Bumping a junction moves the image version
+the base pin; `just track <group>` moves them (`bst source track`), and
+`track-bst-sources.yml` opens one pull request per group. Renovate cannot:
+`track:` is BuildStream's symbolic-tracking field — see
+`docs/research/11-renovate-config.md`. Bumping a junction moves the image version
 with it (see Versioning).
 
 | Layer | Element | Swap it for |
@@ -111,6 +114,12 @@ minor stream and the exact release.
 Groups: `info`, `build`, `run`, `test`, `dev`. `just --list` shows them all.
 `just bst` is the only recipe that talks to BuildStream; everything else wraps
 it or the resulting image.
+
+`just track [group]` refreshes BuildStream source refs with `bst source track`,
+grouped by element directory so a junction bump stays apart from a cheap runtime
+bump; `just track-groups` lists the groups, and `scripts/bst-track-groups.sh`
+derives them from the tree so a fork maintains no list. `just patch-sync` re-syncs
+the FSDK patch queue after a gnome-build-meta bump.
 
 ## Rules that cost hours
 

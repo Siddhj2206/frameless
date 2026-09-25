@@ -5,7 +5,7 @@
 # reference its components as freedesktop-sdk.bst:components/<name>.bst.
 #
 # Update the pin with:
-#   just track elements/freedesktop-sdk.bst
+#   just track freedesktop-sdk
 # The `track` glob follows the 26.08 stream; the weekly Track BuildStream
 # Sources workflow runs it and opens a PR.
 ###############################################################################

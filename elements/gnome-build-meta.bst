@@ -7,7 +7,7 @@
 #
 # gnome-51 is the current stable branch; it expects the freedesktop-sdk-26.08
 # stream that the FSDK junction tracks. Update the pin with:
-#   just bst source track elements/gnome-build-meta.bst
+#   just track gnome-build-meta
 ###############################################################################
 kind: junction
 
