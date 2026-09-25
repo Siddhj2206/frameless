@@ -15,7 +15,7 @@ sources:
 - kind: git_repo
   url: gnome:gnome-build-meta.git
   track: gnome-51
-  ref: 51.0-3-ge34f1eb8c12742aedb1ee65b855c5d88741d9f92
+  ref: 51.0-5-gbe7cb317ee21d45197ba5139c77317f171e20c38
 # The kernel build-depends (strict) on gnome-build-meta's boot-key certificate,
 # and gnome-build-meta's CI generates files/boot-keys/modules/linux-module-cert.crt
 # before building (make -C files/boot-keys generate-keys IMPORT_MODE=snakeoil).
