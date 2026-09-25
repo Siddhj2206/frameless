@@ -1,5 +1,10 @@
 # .pre-commit-config.yaml
 
+# patches/ holds diffs, not source. Their trailing whitespace is significant —
+# a `+` line's trailing space is content — so reformatting them corrupts the
+# patch. They also arrive verbatim from upstream via `just patch-sync`.
+exclude: '^patches/'
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
