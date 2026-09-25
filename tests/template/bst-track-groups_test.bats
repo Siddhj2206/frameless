@@ -11,9 +11,11 @@ setup() {
 	SCRIPT="${REPO_ROOT}/scripts/bst-track-groups.sh"
 }
 
-# Every element whose sources declare `track:`, sorted.
+# Every element whose sources declare `track:`, as a BuildStream element name
+# (relative to elements/), sorted.
 trackable_elements() {
-	(cd "${REPO_ROOT}" && grep -rl --include='*.bst' -E '^[[:space:]]*track:' elements | sort)
+	(cd "${REPO_ROOT}" && grep -rl --include='*.bst' -E '^[[:space:]]*track:' elements |
+		sed 's|^elements/||' | sort)
 }
 
 # Every element the script reports, across all groups, sorted.
@@ -39,7 +41,7 @@ reported_elements() {
 @test "track groups: no element without a track: ref is reported" {
 	local element
 	while read -r element; do
-		grep -qE '^[[:space:]]*track:' "${REPO_ROOT}/${element}"
+		grep -qE '^[[:space:]]*track:' "${REPO_ROOT}/elements/${element}"
 	done < <(reported_elements)
 }
 
@@ -62,8 +64,8 @@ reported_elements() {
 
 @test "track groups: a root element is its own group, a nested one groups by directory" {
 	local root_element nested_element group
-	root_element="$(trackable_elements | grep -E '^elements/[^/]+\.bst$' | head -1)"
-	nested_element="$(trackable_elements | grep -E '^elements/[^/]+/[^/]+\.bst$' | head -1)"
+	root_element="$(trackable_elements | grep -E '^[^/]+\.bst$' | head -1)"
+	nested_element="$(trackable_elements | grep -E '^[^/]+/[^/]+\.bst$' | head -1)"
 
 	# The fixture is the repository's own layout; fail loudly if it changes
 	# shape rather than passing vacuously.

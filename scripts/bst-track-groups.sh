@@ -14,6 +14,8 @@
 # Usage:
 #   bst-track-groups.sh             list the group names
 #   bst-track-groups.sh <group>     list that group's elements
+#
+# Elements are named relative to elements/ — the form `bst source track` takes.
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
@@ -21,9 +23,9 @@ cd "$(git rev-parse --show-toplevel)"
 mapfile -t rows < <(
     grep -rl --include='*.bst' -E '^[[:space:]]*track:' elements |
         sort |
-        while read -r element; do
-            relative="${element#elements/}"
-            group="${relative%%/*}"
+        while read -r path; do
+            element="${path#elements/}"
+            group="${element%%/*}"
             printf '%s %s\n' "${group%.bst}" "${element}"
         done
 )
