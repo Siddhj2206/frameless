@@ -31,7 +31,7 @@ CI runs the same checks; running them locally only makes the pull request quiet.
 | `ninja: fatal: posix_spawn: Resource temporarily unavailable` | unbounded parallel jobs exhaust the runner's process limit | cap them in `buildstream.conf` (`scheduler.builders`, `build.max-jobs`) |
 | an SDK element (`sdk/gtk`, `sdk/webkit2gtk`) rebuilds from source | the graph diverged from the public caches | make the junction match gnome-build-meta exactly: the `patches/freedesktop-sdk` queue and every override |
 | *one* upstream element rebuilds although the junction matches | its key depends on a file gnome-build-meta's CI generates at build time, which a clean checkout lacks | reproduce that file with a patch queue (see `patches/gnome-build-meta` for the boot-key cert) |
-| builds never get warmer; no `bst-*` cache exists | `actions/cache` only saves when the job succeeds | set `save-always: true` |
+| builds never get warmer; the cache package is empty | `Save cache` failed, or `clean.yml` pruned the package | check the `Save cache` step; the package is `ghcr.io/<owner>/<repo>-cache` and `clean.yml` keeps it 2 days |
 | `Overlaps detected` between two elements | both install the same path | add it to one element's `public.bst.overlap-whitelist` |
 | a build command works locally but fails on CI | the remote sandbox differs (no `/dev/stdin`, no network) | write to a file instead of `/dev/stdin`; declare every build input |
 | a change rebuilds the world | the change invalidated a widely-depended-on element | expected; the graph is content-addressed. Build the one element first |
@@ -45,7 +45,8 @@ cheapest diagnostics. `just bst artifact delete <element>` drops a bad artifact.
 |---|---|---|
 | `validate` never runs | branch protection names a check no workflow produces | the context must be exactly `validate` |
 | `validate-bst` fails | the graph does not load | run `just bst show oci/image.bst --deps none` locally |
-| a re-run rebuilds the whole graph instead of reusing artifacts | the Actions cache did not restore — a cold first run, or the 10 GB cap evicted it | check that the `BuildStream cache` step hit; the cap is the standing limit (`docs/research/08-writable-remote-cas.md`). A restored cache re-runs the same graph in ~30 min, rebuilding only the elements whose inputs changed |
+| a re-run rebuilds the whole graph instead of reusing artifacts | the cache did not restore. Read the `Restore cache` log: `No usable cache … starting cold` means the pull failed, and every element is then pulled from upstream again | `scripts/bst-cache-oci.sh` now retries the pull three times and prints oras's error; if it still fails, check the cache package exists and GHCR is reachable. A restored cache re-runs the same graph in minutes, rebuilding only what changed |
+| a big rebuild costs 70 min although nothing changed | a failed cache pull degrades to a cold build, silently and by design — the cache is an optimisation, so `continue-on-error` swallows it | read the `Restore cache` step's log, not the job conclusion; the step succeeds even when it starts cold |
 | Renovate opens nothing | `RENOVATE_TOKEN` is missing or lacks the `workflow` scope | recreate the token |
 | the promotion PR never opens | `stable` does not exist | create the branch |
 | the promotion PR will not merge | `stable` requires an approval | set required approvals to 0 |

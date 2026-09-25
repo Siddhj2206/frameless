@@ -15,6 +15,11 @@
 # treats every problem as "start cold"; push reports the error but the workflow
 # carries `continue-on-error`, so the image still publishes.
 #
+# Retry the pull: the artifact is ~12 GB, GHCR serves blobs through a CDN, and a
+# failure part-way through costs a *cold* build — 70 minutes on frameless, and
+# far more for a graph that rebuilds a desktop stack. A 2026-09-25 run lost the
+# cache to one transient pull failure and re-pulled 771 elements as a result.
+#
 # Environment:
 #   BST_CACHE_REF  required. e.g. ghcr.io/owner/repo-cache
 #   BST_CACHE_KEY  optional. A graph-derived key; when set, a second tag is
@@ -26,6 +31,7 @@
 set -euo pipefail
 
 MEDIA_TYPE="application/vnd.buildstream.cas.tar.zst"
+PULL_ATTEMPTS=3
 CACHE_DIR="${BST_CACHE_DIR:-${HOME}/.cache/buildstream}"
 REF="${BST_CACHE_REF:-}"
 KEY="${BST_CACHE_KEY:-}"
@@ -76,14 +82,36 @@ pull() {
     require_tools oras tar zstd
     login
 
-    local tag
+    local tag attempt reason
     for tag in ${KEY:+"${KEY}"} latest; do
-        echo "==> Trying ${REF}:${tag}"
-        tmp="$(mktemp -d)"
-        # Attempt the pull directly rather than probing with `oras manifest
-        # fetch`, whose subcommand varies across oras CLI versions.
-        if oras pull "${REF}:${tag}" -o "${tmp}" >/dev/null 2>&1 &&
-            [ -f "${tmp}/cache.tar.zst" ]; then
+        for ((attempt = 1; attempt <= PULL_ATTEMPTS; attempt++)); do
+            echo "==> Trying ${REF}:${tag} (attempt ${attempt}/${PULL_ATTEMPTS})"
+            tmp="$(mktemp -d)"
+
+            # Attempt the pull directly rather than probing with `oras manifest
+            # fetch`, whose subcommand varies across oras CLI versions. Keep
+            # oras's own error: without it a lost cache is undiagnosable.
+            if ! oras pull "${REF}:${tag}" -o "${tmp}" >/dev/null 2>"${tmp}/oras.err"; then
+                reason="$(tr '\r' '\n' <"${tmp}/oras.err" | grep -v '^[[:space:]]*$' | tail -3 || true)"
+                echo "==> Pull of ${REF}:${tag} failed:"
+                if [ -n "${reason}" ]; then
+                    printf '%s\n' "${reason}" | sed 's/^/    /'
+                fi
+                rm -rf "${tmp}"
+                tmp=""
+                if [ "${attempt}" -lt "${PULL_ATTEMPTS}" ]; then
+                    sleep 15
+                fi
+                continue
+            fi
+
+            if [ ! -f "${tmp}/cache.tar.zst" ]; then
+                echo "==> ${REF}:${tag} carried no cache.tar.zst; trying the next tag"
+                rm -rf "${tmp}"
+                tmp=""
+                break
+            fi
+
             mkdir -p "${CACHE_DIR}"
             if zstd -d -c "${tmp}/cache.tar.zst" | tar -xf - -C "${CACHE_DIR}"; then
                 rm -rf "${tmp}"
@@ -91,11 +119,13 @@ pull() {
                 echo "==> Restored from ${REF}:${tag}"
                 return 0
             fi
-            echo "==> Extracting ${REF}:${tag} failed; trying the next tag"
-        fi
 
-        rm -rf "${tmp}"
-        tmp=""
+            # A truncated archive will not improve on retry.
+            echo "==> Extracting ${REF}:${tag} failed; trying the next tag"
+            rm -rf "${tmp}"
+            tmp=""
+            break
+        done
     done
 
     echo "==> No usable cache at ${REF}; starting cold"
