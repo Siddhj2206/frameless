@@ -73,6 +73,7 @@ custom/                   where an adopter changes the image
 | Check out an element's artifact | `just bst artifact checkout oci/image.bst --directory /src/out` |
 | Read a build log | `just bst artifact log runtime/common.bst` |
 | Drop a cached artifact | `just bst artifact delete runtime/common.bst` |
+| Refresh tracked source refs | `just track <group>` (wraps `bst source track`; `just track-groups` lists groups) |
 | Enter a build sandbox | `just bst shell --build runtime/common.bst` |
 
 When passing `--format`, avoid spaces — the Justfile recipe word-splits its
@@ -96,6 +97,13 @@ arguments. Use a separator like `--`.
   overrides it at the junction (`gnomeos/initramfs/signed-modules.bst:
   kernel/unsigned-modules.bst`). Overrides are how you replace an upstream
   element without forking upstream.
+- **Element names are relative to `elements/`.** `bst source track
+  freedesktop-sdk.bst`, never `elements/freedesktop-sdk.bst` — BuildStream
+  resolves names inside the elements directory and errors with "Did you mean…?".
+- **`bst source track` rewrites the whole element, not just the ref.** It
+  re-serialises the YAML in BuildStream's own style, so the first track of a
+  hand-formatted element arrives with formatting churn beside the ref change.
+  That is a one-time normalisation — read such a diff for its `ref:` lines.
 
 ## Where to go next
 
