@@ -105,21 +105,22 @@ jobs:
           update-podman: "true"
           install-tools: '["just"]'
 
-      # BuildStream's artifact cache. The public read-only caches in project.conf
-      # cover the FSDK/GBM graph; this persists what we build on top of it, so a
-      # run that only changes one element does not rebuild the world.
+      # The BuildStream cache travels as a GHCR OCI artifact rather than through
+      # actions/cache: the cache is ~14 GB and the per-repo cache limit is
+      # 10 GB, so the entry was evicted and every run started cold. GHCR
+      # container storage and bandwidth are free and uncapped. See
+      # scripts/bst-cache-oci.sh.
       #
-      # Restore and save are separate steps because `save-always` is deprecated
-      # and never worked as intended: a failed run cached nothing. The save step
-      # below carries `if: always()` instead.
+      # The public read-only caches in project.conf still cover the FSDK/GBM
+      # graph; this persists what we build on top of it, so a run that only
+      # changes one element does not rebuild the world.
       - name: Restore cache
-        id: bst-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: ~/.cache/buildstream
-          key: bst-${{ runner.os }}-${{ hashFiles('project.conf', 'elements/freedesktop-sdk.bst', 'elements/gnome-build-meta.bst') }}
-          restore-keys: |
-            bst-${{ runner.os }}-
+        env:
+          BST_CACHE_REF: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}-cache
+          BST_CACHE_KEY: bst-${{ runner.os }}-${{ hashFiles('project.conf', 'elements/freedesktop-sdk.bst', 'elements/gnome-build-meta.bst') }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+        run: just cache-pull
 
       - name: Build timestamp
         id: timestamp
@@ -145,16 +146,24 @@ jobs:
           # consumes the ownership sidecar export just bound.
           just chunkify "${IMAGE_NAME}:${DEFAULT_TAG}"
 
-      # Save even when the build failed: while the graph is being tuned the
-      # failing run is the common case, and what it built is exactly what the
-      # next run should not repeat. The key is the same expression as the
-      # restore step, so a run that already hit the exact key is a no-op.
+      # `latest` is written even when the build failed — while the graph is
+      # being tuned the failing run is the common case, and what it built is
+      # exactly what the next run should not repeat. The graph-keyed tag is
+      # written only for a complete build, so a partial cache cannot claim to be
+      # the complete one for a graph.
       - name: Save cache
         if: always()
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: ~/.cache/buildstream
-          key: bst-${{ runner.os }}-${{ hashFiles('project.conf', 'elements/freedesktop-sdk.bst', 'elements/gnome-build-meta.bst') }}
+        env:
+          BST_CACHE_REF: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}-cache
+          BST_CACHE_KEY: bst-${{ runner.os }}-${{ hashFiles('project.conf', 'elements/freedesktop-sdk.bst', 'elements/gnome-build-meta.bst') }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.build-image.outcome }}" != "success" ]; then
+            unset BST_CACHE_KEY
+          fi
+          just cache-push
 
       - name: Version label
         id: version

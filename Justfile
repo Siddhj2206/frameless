@@ -180,6 +180,21 @@ export:
 
     echo "==> Export complete. Image loaded as {{ image_name }}:{{ image_tag }}"
 
+# ── Cache ────────────────────────────────────────────────────────────
+# The BuildStream cache travels as a GHCR OCI artifact rather than through
+# actions/cache, whose 10 GB per-repo limit the ~14 GB cache always exceeded —
+# so it was evicted and every run started cold. GHCR container storage and
+# bandwidth are free and uncapped. See scripts/bst-cache-oci.sh.
+#
+# CI sets BST_CACHE_REF and (on a successful build) BST_CACHE_KEY.
+[group('build')]
+cache-pull:
+    scripts/bst-cache-oci.sh pull
+
+[group('build')]
+cache-push:
+    scripts/bst-cache-oci.sh push
+
 # ── Chunkah ──────────────────────────────────────────────────────────
 # Rechunk the exported image so OTA updates are content-addressed and smaller.
 # Chunkah's rustix xattr backend uses raw syscalls that bypass LD_PRELOAD, so
