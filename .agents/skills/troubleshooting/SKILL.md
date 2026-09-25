@@ -31,6 +31,7 @@ CI runs the same checks; running them locally only makes the pull request quiet.
 | `ninja: fatal: posix_spawn: Resource temporarily unavailable` | unbounded parallel jobs exhaust the runner's process limit | cap them in `buildstream.conf` (`scheduler.builders`, `build.max-jobs`) |
 | an SDK element (`sdk/gtk`, `sdk/webkit2gtk`) rebuilds from source | the graph diverged from the public caches | make the junction match gnome-build-meta exactly: the `patches/freedesktop-sdk` queue and every override |
 | *one* upstream element rebuilds although the junction matches | its key depends on a file gnome-build-meta's CI generates at build time, which a clean checkout lacks | reproduce that file with a patch queue (see `patches/gnome-build-meta` for the boot-key cert) |
+| a file the compose excludes still reaches the image | an element that re-introduces it by copying flattens the original's split-rules, so `exclude` no longer recognises it | remove it in that element's install-commands; re-declaring the domain on the copy was not honoured (`kernel/unsigned-modules.bst`) |
 | builds never get warmer; no `bst-*` cache exists | `actions/cache` only saves when the job succeeds | set `save-always: true` |
 | `Overlaps detected` between two elements | both install the same path | add it to one element's `public.bst.overlap-whitelist` |
 | a build command works locally but fails on CI | the remote sandbox differs (no `/dev/stdin`, no network) | write to a file instead of `/dev/stdin`; declare every build input |

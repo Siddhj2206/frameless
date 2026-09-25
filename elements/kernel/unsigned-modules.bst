@@ -27,6 +27,14 @@ config:
     - |
       mkdir -p "%{install-root}/usr/lib"
       cp -rT /usr/lib/modules "%{install-root}/usr/lib/modules"
+      # vmlinux is the unstripped kernel: ~490 MB of debug data. Runtime
+      # consumers read /sys/kernel/btf/vmlinux, not this file. The kernel
+      # element declares it in the debug domain, but the copy above flattens
+      # the domains, so the image compose's `exclude: [devel, debug]` no longer
+      # recognises it. Re-declaring the domain on this element did not remove
+      # it from the composed image — the published image's compressed size was
+      # unchanged — so remove it outright.
+      rm -f "%{install-root}/usr/lib"/modules/*/vmlinux
     - |
       # 25.08 kernels install vmlinuz to /boot; 26.08 kernels ship it inside
       # /usr/lib/modules/<ver>/ already. Handle both, then prove it is there.
@@ -35,20 +43,3 @@ config:
         cp /boot/vmlinuz "%{install-root}/usr/lib/modules/${version}"
       fi
       test -f "%{install-root}/usr/lib/modules/${version}/vmlinuz"
-
-# The copy above flattens the kernel element's domains: vmlinux and System.map
-# arrive from its sandbox as ordinary files, so the image compose's
-# `exclude: [devel, debug]` no longer recognises them and a ~490 MB unstripped
-# vmlinux lands in the image. Re-declare the split here — the same rule
-# gnome-build-meta's kernel and dakota's core/linux-fdsdk.bst carry — so the
-# existing exclusion applies again. Runtime consumers read /sys/kernel/btf/vmlinux,
-# not this file, so nothing needs it.
-public:
-  bst:
-    split-rules:
-      devel:
-        (>):
-          - '%{indep-libdir}/modules/*/System.map'
-      debug:
-        (>):
-          - '%{indep-libdir}/modules/*/vmlinux'
