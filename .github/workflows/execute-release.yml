@@ -24,7 +24,7 @@ jobs:
     outputs:
       is-promotion: ${{ steps.check.outputs.is-promotion }}
     steps:
-      - name: Accept a promotion commit or manual recovery
+      - name: Verify promotion commit
         id: check
         env:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
@@ -53,7 +53,7 @@ jobs:
       # receives no builds, so an image can only reach :stable through the
       # candidate digest this workflow promotes. Fail loudly instead of
       # reporting success without promoting anything.
-      - name: Refuse a non-promotion push to stable
+      - name: Reject non-promotion push
         if: steps.check.outputs.is-promotion != 'true'
         shell: bash
         run: |
@@ -72,7 +72,7 @@ jobs:
       issues: write
       packages: write
       pull-requests: write
-    uses: projectbluefin/actions/.github/workflows/reusable-execute-release.yml@ce1d0c6bb5baf8bab3a5b226e693c9fd26b3c4a8 # v1
+    uses: projectbluefin/actions/.github/workflows/reusable-execute-release.yml@f862ab6946fb10e5566bfda8336fd58cedb3b9c3 # v1
     with:
       registry: ghcr.io/${{ github.repository_owner }}
       variants: >-
@@ -103,7 +103,7 @@ jobs:
       packages: read
     # Frameless's direct build does not upload an SBOM artifact. The supported
     # reusable inline mode scans the already-promoted stable image instead.
-    uses: projectbluefin/actions/.github/workflows/reusable-release.yml@ce1d0c6bb5baf8bab3a5b226e693c9fd26b3c4a8 # v1
+    uses: projectbluefin/actions/.github/workflows/reusable-release.yml@f862ab6946fb10e5566bfda8336fd58cedb3b9c3 # v1
     with:
       stream_name: stable
       image: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}

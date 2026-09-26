@@ -3,10 +3,11 @@ permissions:
   contents: read
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - "custom/flatpaks/**"
-      - "build/validate-flatpaks.sh"
+      - "scripts/validate-flatpaks.sh"
       - "tests/contract/validate-flatpaks_test.bats"
       - ".github/workflows/validate-flatpaks.yml"
 jobs:
@@ -31,4 +32,4 @@ jobs:
       # test so a change to the contract runs the check that enforces it.
       - name: Validate Flatpaks
         shell: bash
-        run: build/validate-flatpaks.sh
+        run: scripts/validate-flatpaks.sh

@@ -1,73 +1,92 @@
 ---
 name: overview
 description: >-
-  Architecture, repository layout, and file map for this template.
-  Use when orienting to the repository, tracing how the image is assembled,
-  or deciding which skill covers a task.
+  Architecture, repository layout, and file map for this template. Use when
+  orienting to the repository, tracing how the image is assembled, or deciding
+  which skill covers a task.
 ---
 
 # Overview
 
-This repository builds a bootc operating system image by assembling OCI layers
-rather than by modifying an existing image. Bluefin, Aurora, and Bluefin LTS are
-built the same way, so the desktop configuration here is the one they ship.
+frameless builds a bootc operating system image from a **BuildStream graph**. You
+declare what the image is made of; BuildStream builds and caches each piece and
+composes the result. There is no Containerfile and no shell script that installs
+packages.
+
+If BuildStream is new to you, read the `buildstream` skill first.
 
 ## How the image is assembled
 
-The `Containerfile` is the source of truth, and it is deliberately verbose. It
-defines three things:
+The graph has four layers, and the default target is the OCI image:
 
-1. **Context stage** (`ctx`) — combines the local `build/` and `custom/`
-   directories with files pulled from two OCI images:
+```
+elements/oci/image.bst                     the default target (kind: script)
+  └── elements/image/deps.bst              the manifest (kind: stack)
+        ├── elements/desktop/gnome.bst     the desktop        — swap for KDE/niri/none
+        ├── elements/runtime/*.bst           the ublue runtime  — ujust, brew, firstboot
+        └── elements/custom/custom.bst     your declarations  — from custom/
+```
 
-   - `ghcr.io/projectbluefin/common` — the shared desktop configuration,
-     branding, and the Brew/Flatpak/ujust plumbing
-   - `ghcr.io/ublue-os/brew` — the Homebrew integration
+The two junctions supply everything else:
 
-2. **Base image** — the `FROM` line. It defaults to Fedora Silverblue and is the
-   only place the base is chosen. `just build` reads the image name and tag from
-   it; the Fedora major is read from the base image itself during the build.
+- **freedesktop-sdk** (`elements/freedesktop-sdk.bst`) — the OS: the runtime,
+  libraries, systemd, and the kernel.
+- **gnome-build-meta** (`elements/gnome-build-meta.bst`) — the desktop: GNOME and
+  its dependency tree, plus the plugin junctions and `collect_initial_scripts`.
 
-3. **Phases** — each build script runs in its own `RUN` block, in the order the
-   Containerfile names them. [build/README.md](../../../build/README.md) lists
-   them.
+`elements/oci/layers/` filters the composed graph into the image layer, and
+`elements/oci/image.bst` runs the bootc filesystem steps and hands the layer to
+`build-oci`. Identity lives in `include/os-release.yml`; the version comes from
+the FSDK junction ref.
 
 ## Layout
 
 | Path | Holds |
 |---|---|
-| `Containerfile` | Image assembly: identity, base image, and phases. |
-| `Justfile` | Build, VM, release, and test recipes. |
-| `build/` | Build-time scripts: the phases, helpers, and the `.example` catalogue. |
-| `custom/brew/` | Brewfiles, installed at runtime. |
-| `custom/flatpaks/` | Flatpak preinstall declarations, installed on first boot. |
-| `custom/ujust/` | `ujust` recipes. |
-| `custom/files/` | System files overlaid onto `/`. |
-| `custom/config/` | Per-user config seeded into `/etc/skel/.config/`. |
-| `iso/` | Installer ISO and disk-image configuration. |
+| `project.conf` | The project: name, `min-version`, junctions, options, caches, default target. |
+| `Justfile` | `just bst` and the local loop: build, export, boot a VM, tests. |
+| `elements/` | The graph. `desktop/`, `runtime/`, `custom/`, `oci/`, `core/`, `kernel/`, plus the junctions. |
+| `include/` | Shared YAML merged with `(@)`: aliases, os-release, the generated version. |
+| `files/` | The template's local source payloads: first-boot units, service overrides, the fakecap helper. |
+| `scripts/` | Repository tooling: the Brewfile and Flatpak validators, the chunkah metadata tool. |
+| `patches/` | The freedesktop-sdk patch queue, synced from gnome-build-meta. |
+| `plugins/` | The local `chunkah-ownership` BuildStream plugin. |
+| `custom/` | Where an adopter changes the image: Brewfiles, ujust, Flatpaks, files, config. |
 | `tests/` | `contract/` (interfaces the image must satisfy) and `template/` (this repository's build wiring). |
-| `.github/` | Workflows, Renovate config, issue templates. |
+| `docs/` | `research/` (findings), `learning/` (lessons and records), `agents/` (tracker conventions). |
+| `.github/` | Workflows and Renovate config. |
+
+Each directory above carries a small `README.md` explaining what it holds. Two
+pairs share a leaf name and are easy to confuse:
+
+- **`files/` vs `custom/files/`** — `files/` is the *template's* build input,
+  referenced by an element as `kind: local`; `custom/files/` is the *adopter's*
+  seam, a tree that mirrors `/` and is copied in by `custom/custom.bst`. Editing
+  the first means editing an element; adding to the second does not.
+- **`plugins/` vs `elements/plugins/`** — `plugins/` is the local chunkah plugin
+  (`origin: local` in `project.conf`); `elements/plugins/` holds the junction
+  elements for the upstream plugin packages.
 
 ## Which skill
 
 | I need to… | Load |
 |---|---|
 | Understand the repository, or find the right skill | `overview` |
+| Learn BuildStream — project, element, junction, directive | `buildstream` |
 | Fork it and reach a first green build | `onboarding` |
 | Add or remove a package, app, or command | `customize` |
-| Change the Containerfile, Justfile, or a build phase | `build` |
+| Change the image graph or the Justfile | `build` |
 | Change a workflow, Renovate, or the release model | `ci` |
 | Fix something broken, or check before a pull request | `troubleshooting` |
 
 ## Upstream
 
-The template consumes Project Bluefin's shared infrastructure rather than
-copying it:
+The template consumes upstream rather than copying it:
 
-- `projectbluefin/common` — the shared runtime layer and the lifecycle label
-  workflow
-- `projectbluefin/actions` — the reusable workflows for image build, promotion,
-  sync, PR validation, and Renovate
-- `ublue-os/brew` — the Homebrew integration
+- `freedesktop-sdk` — the OS, via a junction.
+- `gnome-build-meta` — the desktop, via a junction (swap it for another desktop).
+- `projectbluefin/common` and `ublue-os/brew` — the ublue runtime, as git and
+  docker sources in `elements/runtime/`.
+- `projectbluefin/actions` — the reusable CI workflows.
 
 Changes stay in this repository. `ublue-os/*` is read-only.

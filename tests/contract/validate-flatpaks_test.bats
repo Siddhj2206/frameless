@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Tests for build/validate-flatpaks.sh.
+# Tests for scripts/validate-flatpaks.sh.
 #
 # All runs use a fake flatpak binary, never the host's. The contract under
 # test: every line must be blank, a '#' comment, a [Flatpak Preinstall <app-id>]
@@ -9,7 +9,7 @@
 #
 # Run with: bats tests/contract/validate-flatpaks_test.bats
 
-SCRIPT="${BATS_TEST_DIRNAME}/../../build/validate-flatpaks.sh"
+SCRIPT="${BATS_TEST_DIRNAME}/../../scripts/validate-flatpaks.sh"
 
 setup() {
     WORKDIR="$(mktemp -d)"
