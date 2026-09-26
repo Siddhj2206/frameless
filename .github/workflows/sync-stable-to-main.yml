@@ -13,9 +13,15 @@ on:
   push:
     branches:
       - stable
-  # Normally a no-op. Dispatch it to force the sync after repairing the branch
-  # model by hand.
-  workflow_dispatch:
+  # Deliberately NOT dispatchable. The reusable force-resets the target to the
+  # source when the target has commits the source lacks, and here the source is
+  # `stable` and the target is `main`. If `stable` is ever behind `main`, a
+  # manual run would reset `main` to `stable`. The normal trigger (a push to
+  # `stable`, which only a promotion produces) always leaves the two trees
+  # identical, so the reusable's tree check skips and nothing is pushed.
+  #
+  # To repair a diverged branch model by hand, reconcile `stable` from `main`
+  # (the promotion path), never by dispatching this workflow.
 
 permissions:
   contents: write
@@ -27,7 +33,7 @@ concurrency:
 jobs:
   sync:
     name: Keep main up-to-date with stable
-    uses: projectbluefin/actions/.github/workflows/reusable-sync-branches.yml@ce1d0c6bb5baf8bab3a5b226e693c9fd26b3c4a8 # v1
+    uses: projectbluefin/actions/.github/workflows/reusable-sync-branches.yml@f862ab6946fb10e5566bfda8336fd58cedb3b9c3 # v1
     permissions:
       contents: write
     with:

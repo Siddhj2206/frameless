@@ -28,8 +28,11 @@ before. Substitute your own `{owner}/{repo}` throughout.
 
 ## 1. Rename the project
 
-See the Quick start in [README.md](../../../README.md#quick-start). Three identity
-sites, and `just test-contract` fails when they disagree.
+See the Quick start in [README.md](../../../README.md#quick-start). The identity
+is literal only in `project.conf` — `name`, and `image-vendor`,
+`image-description`, `image-repo-url`, `image-code-name` under `variables:`.
+`image-vendor` must be your GitHub owner (lowercased) or the build fails on the
+upgrade-origin check; `just test-contract` fails if the identity drifts.
 
 ## 2. Enable Actions
 
@@ -130,8 +133,8 @@ Never commit to `stable` directly. It only ever receives the promotion.
 
 ## 7. Protect `main`
 
-Require the `validate` check, so nothing lands without passing shellcheck and
-hadolint.
+Require the `validate` check, so nothing lands without passing `just check`,
+shellcheck, and pre-commit.
 
 - **`gh`**:
 

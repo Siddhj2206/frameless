@@ -1,7 +1,7 @@
-name: Cleanup Old Images
+name: Clean up old images and caches
 on:
   schedule:
-    - cron: "0 0 * * 0" # Weekly on Sunday at midnight UTC
+    - cron: "0 0 * * *" # daily at midnight UTC
   workflow_dispatch:
 
 permissions:
@@ -11,13 +11,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
 
 jobs:
-  delete-older-than-90:
+  # The image keeps a week of tagged releases and a 90-day window.
+  images:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - name: Resolve package name
+      - name: Package name
         id: package
         shell: bash
         run: |
@@ -27,11 +28,40 @@ jobs:
           name="${{ github.event.repository.name }}"
           echo "name=${name,,}" >> "${GITHUB_OUTPUT}"
 
-      - name: Cleanup old images
-        uses: projectbluefin/actions/bootc-build/ghcr-cleanup@ce1d0c6bb5baf8bab3a5b226e693c9fd26b3c4a8 # v1
+      - name: Clean up images
+        uses: projectbluefin/actions/bootc-build/ghcr-cleanup@f862ab6946fb10e5566bfda8336fd58cedb3b9c3 # v1
         with:
           packages: ${{ steps.package.outputs.name }}
           older-than: 90 days
           keep-n-tagged: 7
           keep-n-untagged: 7
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  # The cache package gains a tag on every build — `latest` always, plus a
+  # graph key on a successful one — so it is pruned far more aggressively than
+  # the image. Keeping the two newest tagged entries covers `latest` and the
+  # current graph, which is all a restore looks for.
+  cache:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Package name
+        id: package
+        shell: bash
+        run: |
+          # <repository name>-cache, lowercased: the same derivation
+          # build-image.yml uses for the cache reference, so a renamed fork
+          # cleans the package it actually pushes.
+          name="${{ github.event.repository.name }}-cache"
+          echo "name=${name,,}" >> "${GITHUB_OUTPUT}"
+
+      - name: Clean up cache
+        uses: projectbluefin/actions/bootc-build/ghcr-cleanup@f862ab6946fb10e5566bfda8336fd58cedb3b9c3 # v1
+        with:
+          packages: ${{ steps.package.outputs.name }}
+          older-than: 2 days
+          keep-n-tagged: 2
+          keep-n-untagged: 0
           github-token: ${{ secrets.GITHUB_TOKEN }}
