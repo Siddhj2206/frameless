@@ -16,7 +16,7 @@ sources:
 - kind: git_repo
   url: github:projectbluefin/common.git
   track: main
-  ref: v2026.08-163-g3399e47791bde6edc473b17f2760aeb22583610d
+  ref: v2026.08-206-gd2eb9dd0102d113d2117002a5febb1310a0fb9fb
 
 build-depends:
 - core/sandbox-tools.bst
