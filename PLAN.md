@@ -54,9 +54,16 @@ Today it does. bootc arrives as `gnomeos-deps/bootc.bst` and the initramfs as
 gnome-build-meta. Every bootable frameless image is a GNOME image in its
 dependency graph, whatever it ships.
 
-frameless owns `boot/`. gnome-build-meta becomes `desktop/gnome/` and nothing
-else. dakota already carries its own bootc override, so the shape of the move
-is proven.
+The move is priced in `docs/research/13-owning-the-boot-spine.md`, and it is
+steeper than it looks. Owning the spine means building it: BuildStream's cache
+key includes the owning project's `fatal-warnings` and `environment`, which
+gnome-build-meta sets and frameless does not, so a verbatim copy re-keys and
+bootc compiles its 416 crates from source in frameless's CI on every bump.
+Against that, the desktop never touches the spine — `gnomeos-deps/deps.bst` has
+no bootc or initramfs reference — so a non-GNOME payload loses no boot
+capability today, only the junction, its patch queue and its override mirror.
+
+Which way that trade falls is open on the map.
 
 ### The runtime is a payload
 
