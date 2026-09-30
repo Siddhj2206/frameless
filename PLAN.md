@@ -7,6 +7,16 @@ This file states what frameless is. The route through what is not yet decided
 lives on the tracker, on the map
 **[frameless as bones](https://github.com/Siddhj2206/frameless/issues/64)**.
 
+## Who this is for
+
+A hobbyist who is willing to learn, and the agent working on their behalf.
+
+Not an OS developer. They want an image that is theirs, and they will read, ask,
+and try things — but they will not debug a boot chain. Two consequences run
+through everything below: the golden path has to work before it is understood,
+and a failure has to be legible when it happens. The learning track is part of
+the product, not a by-product of it.
+
 ## The bones are a minimum
 
 A **shape** is what you are building. The **bones** are the least an image of
@@ -92,18 +102,29 @@ A shape moves up a tier when someone pays for it.
 - **Not a boot guarantee on hardware nobody tested.** The ladder says which
   tier a shape is on.
 
+## References
+
+One per shape, and all three are BuildStream projects composing from
+freedesktop-sdk:
+
+| Shape            | Reference                                                                           |
+| ---------------- | ----------------------------------------------------------------------------------- |
+| Bootable desktop | [dakota](https://github.com/projectbluefin/dakota)                                   |
+| Bootable server  | [projectbluefin/server](https://github.com/projectbluefin/server)                    |
+| Container        | [projectbluefin/fsdk-containers](https://github.com/projectbluefin/fsdk-containers)  |
+
+Only dakota updates by bootc. `projectbluefin/server` updates by
+systemd-sysupdate over signed UKIs and a DM-verity DDI, and
+`projectbluefin/fsdk-containers` has no boot chain at all. Whether frameless
+carries a second update mechanism, or reads those two only for what their
+payloads contain, is open on the map.
+
 ## If frameless joins Project Bluefin
 
-Bluefin's org is already multi-payload — bluefin, aurora, bazzite, server —
-which is the shape this plan is built for. Two things to keep straight if it
-happens.
-
-frameless stays a template. It encodes no distribution's taste; Bluefin's
-images are payloads or forks of it.
-
-`projectbluefin/server` updates by sysupdate and sysext, not bootc. That is a
-different spine and it is out of scope here. A homelab server on bootc is in
-scope; a sysupdate image is a separate effort.
+Bluefin's org is already multi-payload — bluefin, aurora, bazzite, server,
+fsdk-containers — which is the shape this plan is built for. frameless stays a
+template: it encodes no distribution's taste, and Bluefin's images are payloads
+or forks of it.
 
 ## See also
 
