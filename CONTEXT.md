@@ -48,6 +48,33 @@ frameless's product shape — a minimal, forkable starting point with one defaul
 target, not a finished image.
 _Avoid_: skeleton, boilerplate
 
+**shape**:
+What you are building, named. A shape is a spine, a payload and a target taken
+together. frameless ships one: the bootable desktop.
+_Avoid_: variant, flavour, profile
+
+**spine**:
+The elements that make an image bootable — kernel modules, initramfs, bootc, and
+the filesystem layout bootc expects. A container has no spine.
+_Avoid_: boot layer, boot chain, base
+
+**payload**:
+What an image carries past the minimum its shape requires: a desktop, a runtime,
+services, an application. The payload list is `elements/image/deps.bst`.
+_Avoid_: content, packages
+
+**target**:
+The element that assembles an image and labels it. A target that depends on a
+spine is bootable; one that does not, is not.
+_Avoid_: top-level element, output
+
+**container**, **base**, **desktop**:
+The three shapes the vocabulary names. `desktop` is what frameless builds.
+`base` is the same target with the desktop line removed from the manifest.
+`container` is the only shape that needs a target of its own, because it has no
+spine.
+_Avoid_: server (a use of `base`), headless (how `base` looks, not what it is)
+
 **ublue runtime**:
 The common/brew/flatpak/ujust content, re-derived as BuildStream elements rather
 than layered OCI images.
