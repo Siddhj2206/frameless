@@ -8,10 +8,10 @@ directory on every boot would discard their edits, so updating a user who
 already exists is the `ujust install-config` command, never an automatic login
 hook.
 
-This is the last step in `build/10-overlay.sh`'s overlay order
-(`common/shared`, `ublue-os/brew`, `custom/files`, then this one), so a file here
-also wins over an inherited one — including the `/etc/skel/.config/` files that
-Common ships. Overriding that way is intended.
+`elements/custom/custom.bst` copies this directory into `/etc/skel/.config/`
+after `custom/files/`, so a file here also wins over an inherited one — including
+the `/etc/skel/.config/` files that Common's shared layer ships. Overriding that
+way is intended.
 
 `custom/files/` is the seam for system payloads outside `~/.config/`. The
 `customize` skill decides which seam a given file belongs in.
