@@ -20,7 +20,7 @@ export filesystem := env("BUILD_FILESYSTEM", "btrfs")
 # reproducibility; override with BST2_IMAGE. This digest carries BuildStream 2.8,
 # matching project.conf's min-version — the runner and min-version are one
 # decision.
-export bst2_image := env("BST2_IMAGE", "registry.gitlab.com/freedesktop-sdk/infrastructure/freedesktop-sdk-docker-images/bst2@sha256:99fc77b55a18f57d619f5b74ff7228762f52d7c5bde6150441b49f22769ae13b")
+export bst2_image := env("BST2_IMAGE", "registry.gitlab.com/freedesktop-sdk/infrastructure/freedesktop-sdk-docker-images/bst2@sha256:d147af45a82104518bf1433b6043edd4aaf5f979bd6cd438099f8b9ff772d883")
 
 # VM settings.
 export vm_ram := env("VM_RAM", "8192")
