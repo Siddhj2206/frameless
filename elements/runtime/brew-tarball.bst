@@ -14,7 +14,7 @@ sources:
   track: latest
   (?):
   - arch == "x86_64":
-      ref: 926ce25a12476755bf53ac706e7d519d40946e7fefa3b1838920f259a43821ee
+      ref: f6028423b2f8066ae18278e42db1a5c974e69dfd1b0746921d7ca721ba08a81d
   - arch == "aarch64":
       ref: aff477fa0ccbbb467946ed12e1ec6cd7726281e555daa152ef64af8f3106a5e6
 
