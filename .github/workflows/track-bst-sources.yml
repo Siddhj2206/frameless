@@ -1,0 +1,127 @@
+name: Track BuildStream Sources
+
+# BuildStream commit/digest refs — the junctions and the git/docker sources —
+# can only be refreshed by BuildStream itself (`bst source track`), because
+# `track:` is BuildStream's symbolic-tracking field and Renovate has no
+# datasource for it. This runs `just track` and opens one pull request per
+# group, so a junction bump (which rebuilds the world) never rides along with a
+# cheap runtime bump. The groups are derived from the tree, so a fork maintains
+# no list: scripts/bst-track-groups.sh.
+#
+# Never automerged: a ref bump must build first. Note that a PR opened with the
+# default GITHUB_TOKEN does not trigger other workflows, so its checks may need
+# a manual re-run; a PAT with the `workflow` scope avoids that.
+on:
+  schedule:
+    - cron: "0 6 * * 1" # weekly, Monday 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  # Approving the check runs GitHub holds for a bot-authored PR.
+  actions: write
+
+concurrency:
+  group: track-bst-sources
+  cancel-in-progress: false
+
+jobs:
+  track:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+
+      - name: Track each group and open a pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          while read -r group; do
+            just track "${group}"
+
+            if git diff --quiet; then
+              echo "==> ${group}: no ref moved"
+              continue
+            fi
+
+            branch="auto/track-bst-${group}"
+            title="chore(deps): update ${group} BuildStream refs"
+
+            git checkout -B "${branch}"
+            git add elements/
+            git commit -m "${title}"
+            # The branch is bot-owned and rebuilt from main each run, so it is
+            # force-pushed — with a lease. A lease compares against a
+            # remote-tracking ref, and the CI checkout has none for this branch,
+            # so fetch it first (a brand-new branch has no ref; that is fine).
+            git fetch --quiet origin "+refs/heads/${branch}:refs/remotes/origin/${branch}" || true
+            git push --force-with-lease origin "${branch}"
+            git checkout -f main
+
+            {
+              printf "Refreshed with \`just track %s\` (\`bst source track\`).\n\n" "${group}"
+              printf "\`\`\`diff\n%s\n\`\`\`\n\n" "$(git diff main "${branch}" -- elements/)"
+              printf 'Never automerged: the image must build first.\n'
+            } > /tmp/pr-body.md
+
+            if gh pr view "${branch}" >/dev/null 2>&1; then
+              gh pr edit "${branch}" --title "${title}" --body-file /tmp/pr-body.md
+            else
+              gh pr create --base main --head "${branch}" \
+                --title "${title}" --body-file /tmp/pr-body.md
+            fi
+          done < <(just track-groups)
+
+      # GitHub holds every check run it creates for a bot-authored pull request
+      # in `action_required` until someone approves it. Poll: a run takes a
+      # moment to appear after its branch is pushed.
+      - name: Approve bot PR checks
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          runs_filter='
+            .workflow_runs[]
+            | select(.head_branch | startswith("auto/track-bst-"))
+            | select(.actor.login == "github-actions[bot]")
+            | .id'
+          approved=0
+          for attempt in 1 2 3 4 5 6; do
+            mapfile -t run_ids < <(
+              gh api "repos/${GITHUB_REPOSITORY}/actions/runs?status=action_required&per_page=100" \
+                --jq "${runs_filter}"
+            )
+            if [ "${#run_ids[@]}" -eq 0 ]; then
+              # Nothing pending. Stop once something has been approved; a first
+              # empty pass only means the runs have not appeared yet.
+              if [ "${approved}" -gt 0 ]; then
+                break
+              fi
+            else
+              for run_id in "${run_ids[@]}"; do
+                if gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/approve" >/dev/null; then
+                  echo "Approved run ${run_id}"
+                  approved=$((approved + 1))
+                else
+                  echo "::warning::Could not approve run ${run_id}"
+                fi
+              done
+            fi
+            if [ "${attempt}" -lt 6 ]; then
+              sleep 15
+            fi
+          done
+          if [ "${approved}" -eq 0 ]; then
+            echo "::notice::No pending runs matched; nothing to approve."
+          fi

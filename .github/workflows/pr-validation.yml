@@ -1,6 +1,7 @@
 name: PR Validation
 
 on:
+  workflow_dispatch:
   pull_request:
     branches:
       - main
@@ -28,7 +29,7 @@ jobs:
       # rename, so paths main moved survive on their old paths and the branch's
       # tree stops matching main's. execute-release.yml's tree guard refuses such
       # a release after the merge; fail it here instead, while it is still a PR.
-      - name: Verify the promotion matches main
+      - name: Verify promotion
         if: github.head_ref == 'auto/promote-main-to-stable'
         shell: bash
         env:
@@ -49,8 +50,7 @@ jobs:
           echo "The promotion tree matches main."
 
       # The repository's shell scripts are the *.sh files git tracks — the same
-      # definition `just lint` uses. validate-pr word-splits this input into
-      # shellcheck arguments.
+      # definition `just lint` uses.
       - name: Resolve shellcheck scope
         id: shell-scope
         shell: bash
@@ -59,9 +59,30 @@ jobs:
           echo "glob=${glob}" >> "${GITHUB_OUTPUT}"
           echo "Resolved shellcheck scope: ${glob}"
 
-      - name: Validate
-        uses: projectbluefin/actions/bootc-build/validate-pr@ce1d0c6bb5baf8bab3a5b226e693c9fd26b3c4a8 # v1
-        with:
-          shellcheck-glob: ${{ steps.shell-scope.outputs.glob }}
-          dockerfile: "Containerfile"
-          hadolint-config: ".github/hadolint.yaml"
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+
+      - name: Install shellcheck
+        shell: bash
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y shellcheck
+          pip install 'pre-commit==4.6.0'
+
+      - name: Check Justfiles
+        shell: bash
+        run: just check
+
+      - name: Shellcheck
+        shell: bash
+        env:
+          SHELLCHECK_GLOB: ${{ steps.shell-scope.outputs.glob }}
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          # shellcheck disable=SC2086
+          shellcheck ${SHELLCHECK_GLOB}
+
+      - name: Pre-commit
+        shell: bash
+        run: pre-commit run --all-files

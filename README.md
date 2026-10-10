@@ -1,14 +1,19 @@
 # frameless
 
-A template for building your own bootc operating system image, assembled the
-same way Bluefin, Aurora, and Bluefin LTS are: from shared OCI layers rather
-than by modifying an existing image. The desktop configuration comes from
-[`projectbluefin/common`](https://github.com/projectbluefin/common), Homebrew
-from [`ublue-os/brew`](https://github.com/ublue-os/brew), and the rest is yours.
+A template for building your own bootc operating system image from a
+[BuildStream](https://buildstream.build/) graph. You declare what the image is
+made of — an OS base, a desktop, a runtime — and BuildStream builds and caches
+each piece and composes the result. There is no Containerfile and no shell script
+that installs packages.
 
-It is built to be driven by hand or by an agent.
+It composes two junctions: [freedesktop-sdk](https://gitlab.com/freedesktop-sdk/freedesktop-sdk)
+(the OS) and [gnome-build-meta](https://gitlab.gnome.org/GNOME/gnome-build-meta)
+(the desktop). The desktop is one element you can swap for KDE, niri, or nothing.
+The [ublue runtime](https://github.com/projectbluefin/common) — `ujust`, Homebrew,
+Flatpak preinstalls — is bundled. The rest is yours.
 
-> Be the one who moves, not the one who is moved.
+It is built to be driven by hand or by an agent. **New to BuildStream? Start with
+the [`buildstream` skill](.agents/skills/buildstream/SKILL.md).**
 
 ## What Makes this Raptor Different?
 
@@ -17,7 +22,7 @@ Here are the changes from [Base Image Name]. This image is based on
 
 ### Added Packages (Build-time)
 
-- List the packages you install at build time
+- List the elements you add to `elements/image/deps.bst`
 
 ### Added Applications (Runtime)
 
@@ -30,8 +35,7 @@ Here are the changes from [Base Image Name]. This image is based on
 
 ### Configuration Changes
 
-- Systemd services enabled or disabled
-- Desktop environment changes
+- Desktop environment changes (the `desktop/` element)
 - Other notable modifications
 
 _Last updated: [date]_
@@ -42,30 +46,31 @@ _Last updated: [date]_
 ## Quick start
 
 1. **Create your repository** — "Use this template" on GitHub.
-2. **Rename the project.** The published name is your repository name. Three
-   files carry it as a literal, and `just test-contract` fails if they disagree:
-
-   - `Containerfile` — the `# Name:` comment and `ARG IMAGE_NAME`
-   - `Justfile` — the `IMAGE_NAME` default
-   - `artifacthub-repo.yml` — `repositoryID`
-
-   Grep for `frameless` afterwards to catch the prose and the examples.
+2. **Rename the project.** The identity is literal only in `project.conf`:
+   `name:` is the image name, and `image-vendor`, `image-description`,
+   `image-repo-url` and `image-code-name` are under `variables:`. Two matter for
+   the registry: **`image-vendor`** is your GitHub owner or organisation
+   (lowercased) — it is the first segment of the image reference and becomes the
+   `bootc upgrade` origin, and the build fails loudly if it does not match where
+   CI pushes — and **`image-repo-url`** feeds the os-release URLs and the OCI
+   source label. Everything else reads them by reference, and `just test-contract`
+   fails if they drift. Grep for `frameless` afterwards to catch the prose and
+   the examples.
 3. **Finish setup.** [The `onboarding` skill](.agents/skills/onboarding/SKILL.md)
    carries the rest — enabling Actions, auto-merge and workflow permissions, the
-   Renovate token, the `stable` branch, branch protection on both branches, and
-   the labels. Every step has a `gh` command and a GitHub-website route, and the
-   skill ends by auditing that each setting matches.
+   Renovate token, the `stable` branch, branch protection, and the labels. Every
+   step has a `gh` command and a GitHub-website route.
 
 ## What's included
 
-**Build system**
+**Build**
 
+- A BuildStream graph that builds a bootc OCI image
 - A build on every push to `main`, publishing `:stable-testing`
-- Renovate through `projectbluefin/actions`, updating pinned actions and image
+- A graph-load gate (`just bst show`) that fails fast when the graph cannot load
+- Renovate through `projectbluefin/actions`, updating pinned actions and
   digests every six hours
 - Images older than 90 days pruned automatically
-- Pull requests validated for shellcheck, hadolint, Brewfiles, Flatpaks,
-  Justfiles, and Renovate config
 - Keyless OIDC signing on every published image
 
 **Runtime**
@@ -73,24 +78,17 @@ _Last updated: [date]_
 - Homebrew, pre-staged at build time and unpacked on first boot
 - Flatpaks declared in `custom/flatpaks/`, installed on first boot
 - `ujust` shortcuts for the Brewfiles and for re-applying configuration
-- `uupd` for scheduled system updates
 
 ## Customize
 
-Pick your base image on the `Containerfile`'s `FROM` line; the template defaults
-to Fedora Silverblue. That line is the only place the base is chosen: `just build`
-reads the image name and the tag from it, and the Fedora major comes from the
-base image itself during the build.
+The image is a graph. You change it in three places:
 
-Then add to your image:
-
-- **System packages** — `build/20-packages-and-services.sh` ([guide](build/README.md))
-- **CLI tools** — `custom/brew/` ([guide](custom/brew/README.md))
-- **GUI apps** — `custom/flatpaks/` ([guide](custom/flatpaks/README.md))
-- **Commands** — `custom/ujust/` ([guide](custom/ujust/README.md))
-
-[The `customize` skill](.agents/skills/customize/SKILL.md) decides which of
-those a given package belongs in.
+- **Your own declarations** — `custom/` (Brewfiles, ujust, Flatpaks, files,
+  config). [The `customize` skill](.agents/skills/customize/SKILL.md) decides
+  which.
+- **Image content** — a line in `elements/image/deps.bst`.
+- **The desktop** — replace `elements/desktop/gnome.bst` for KDE, niri, or a
+  no-GUI image.
 
 ## Releases
 
@@ -147,12 +145,14 @@ network connection. Check them with `systemctl status brew-setup.service` and
 
 ## Local testing
 
+`bst` is not installed locally; `just bst` runs it in the pinned container.
+
 ```bash
-just build            # build the container image
-just build-qcow2      # build a QCOW2 disk image
-just run-vm-qcow2     # boot it in a browser-based VM
-just build-iso        # build an installer ISO
-just test-unit        # run the test suite
+just bst show oci/image.bst --deps none   # load the graph, no build
+just build                                # build + load the OCI image into podman
+just generate-bootable-image              # install it to bootable.raw via bootc
+just boot-vm                              # boot that disk in QEMU
+just test-unit                            # run the test suite
 ```
 
 ## Troubleshooting
@@ -167,16 +167,15 @@ surprises:
 - **No `brew`.** `brew-setup.service` unpacks Homebrew on first boot; check its
   status before reaching for a reinstall.
 
-## Community
-
-- [Universal Blue Discord](https://discord.gg/WEu6BdFEtp)
-- [bootc discussions](https://github.com/bootc-dev/bootc/discussions)
-
 ## Learn more
 
-- [Universal Blue](https://universal-blue.org/)
+- [BuildStream](https://buildstream.build/) — and the local
+  [`buildstream` skill](.agents/skills/buildstream/SKILL.md)
+- [freedesktop-sdk](https://gitlab.com/freedesktop-sdk/freedesktop-sdk) and
+  [gnome-build-meta](https://gitlab.gnome.org/GNOME/gnome-build-meta) — the two
+  junctions
 - [bootc](https://containers.github.io/bootc/)
-- [Project Bluefin contributing guide](https://docs.projectbluefin.io/contributing/)
+- [Universal Blue](https://universal-blue.org/)
 
 ## Contributing
 
