@@ -35,8 +35,9 @@ the ID with `flatpak search`, or on [Flathub](https://flathub.org/).
 
 ## First boot
 
-The Flathub remote comes from `/etc/flatpak/remotes.d/flathub.flatpakrepo`, which
-the build fetches, so there is nothing to add by hand.
+The Flathub remote comes from the GNOME OS base image, which installs
+`/usr/share/flatpak/remotes.d/flathub.flatpakrepo`
+(`gnomeos-deps/flathub-config.bst`), so there is nothing to add by hand.
 
 `flatpak-preinstall.service` needs the network. When it cannot reach Flathub it
 logs a warning, installs nothing, and **still exits successfully**, so it does

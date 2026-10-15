@@ -1,0 +1,43 @@
+# Source aliases.
+#
+# Named URL prefixes used by element sources, so a URL appears once and can be
+# changed without touching every element. This table is deliberately broad: it
+# is a convenience for adopters, so that an element copied from freedesktop-sdk,
+# gnome-build-meta or dakota resolves its URLs without a trip to add an alias
+# first. Add your own here too.
+#
+# See: https://docs.buildstream.build/master/format_project.html
+aliases:
+  # Git hosts
+  codeberg: https://codeberg.org/
+  freedesktop: https://gitlab.freedesktop.org/
+  github: https://github.com/
+  gitlab: https://gitlab.com/
+  gnome: https://gitlab.gnome.org/GNOME/
+  gnome_gitlab: https://gitlab.gnome.org/
+  kernel: https://git.kernel.org/pub/scm/
+  savannah: https://git.savannah.gnu.org/git/
+
+  # File hosts
+  codeberg_files: https://codeberg.org/
+  cpan: https://cpan.metacpan.org/
+  crates: https://static.crates.io/
+  fedora_rpms: https://src.fedoraproject.org/rpms/
+  flathub: https://flathub.org/repo/
+  freedesktop_files: https://gitlab.freedesktop.org/
+  freedesktop_people: https://people.freedesktop.org/
+  freedesktop_software: https://www.freedesktop.org/software/
+  ftp_gnu_org: https://ftp.gnu.org/gnu/
+  ghcr: https://ghcr.io/
+  github_files: https://github.com/
+  gitlab_files: https://gitlab.com/
+  gnome_downloads: https://download.gnome.org/sources/
+  gnome_extensions: https://extensions.gnome.org/download-extension/
+  gnome_nightly: https://nightly.gnome.org/
+  gstreamer: https://gstreamer.freedesktop.org/
+  launchpad: https://launchpad.net/
+  mozilla: https://ftp.mozilla.org/pub/
+  pypi: https://files.pythonhosted.org/packages/
+  sourceforge: https://downloads.sourceforge.net/
+  videolan_pub: https://download.videolan.org/pub/
+  ziglang: https://ziglang.org/

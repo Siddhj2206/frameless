@@ -1,0 +1,7 @@
+{
+  "comment": "Written by `just patch-sync`; verified offline by `just patch-drift-check`.",
+  "files": {
+    "0001-project.conf-Add-GNOME-CAS-servers.patch": "2a79bad1e6159c0b31a9cd5b914a7eb34f0431c406b27974fe12dbe5990d49e7"
+  },
+  "gnome-build-meta-sha": "e34f1eb8c12742aedb1ee65b855c5d88741d9f92"
+}
