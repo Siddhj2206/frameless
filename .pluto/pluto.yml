@@ -1,0 +1,27 @@
+# Pluto tasks for this repo. See https://github.com/Siddhj2206/pluto/blob/rewrite/docs/tasks.md
+# The image matches the Justfile's bst2 pin. BuildStream needs a privileged box,
+# which the host has to allow once: pluto box grant privileged
+image: registry.gitlab.com/freedesktop-sdk/infrastructure/freedesktop-sdk-docker-images/bst2@sha256:99fc77b55a18f57d619f5b74ff7228762f52d7c5bde6150441b49f22769ae13b
+requires: [privileged]
+
+tasks:
+  # Quick check that the graph loads, and what's cached. A few minutes.
+  show:
+    timeout: 30m
+    run:
+      - |
+        version=$(grep -E '^\s*ref:' elements/freedesktop-sdk.bst | head -1 | sed -E 's/.*freedesktop-sdk-//; s/-[0-9]+-g[0-9a-f]+$//')
+        printf 'fsdk-version: "%s"\n' "$version" > include/fsdk-version.yml
+      - bst --no-interactive show --format '%{state} %{name}' oci/image.bst | sort | uniq -c -w 8 | head -5
+
+  # The full image, nightly. BuildStream's cache stays in the box, so later
+  # nights only rebuild what changed. Fetchers are lower than CI's 32 for a home
+  # connection.
+  build:
+    schedule: "0 2 * * *"
+    timeout: 12h
+    run:
+      - |
+        version=$(grep -E '^\s*ref:' elements/freedesktop-sdk.bst | head -1 | sed -E 's/.*freedesktop-sdk-//; s/-[0-9]+-g[0-9a-f]+$//')
+        printf 'fsdk-version: "%s"\n' "$version" > include/fsdk-version.yml
+      - bst --no-interactive --fetchers 4 build oci/image.bst
